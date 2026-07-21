@@ -1,9 +1,8 @@
 const BASE = '/api'
 
-export async function getSongUrl(id: number, realIP?: string): Promise<{ id: number; url: string | null }> {
-  const p = new URLSearchParams({ id: String(id), level: 'exhigh' })
-  if (realIP) p.set('realIP', realIP)
-  const r = await fetch(`${BASE}/song/url/v1?${p}`)
+export async function getSongUrl(id: number): Promise<{ id: number; url: string | null }> {
+  // 区域解锁(realIP)由后端按需自动注入,前端无需传参。
+  const r = await fetch(`${BASE}/song/url/v1?id=${id}&level=exhigh`)
   if (!r.ok) throw new Error(`song/url ${r.status}`)
   const j: any = await r.json()
   const raw: string | null = j?.data?.[0]?.url ?? null

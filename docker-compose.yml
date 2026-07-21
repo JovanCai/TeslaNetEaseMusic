@@ -8,14 +8,14 @@ services:
   app:
     build:
       context: .
-      args:
-        VITE_REAL_IP: ${VITE_REAL_IP}
     depends_on: [ncm-api]
     ports: ["${APP_PORT:-80}:80"]        # 端口被占用可在 .env 设 APP_PORT=8080 等
     environment:
       - NCM_BASE=http://ncm-api:3000
       - NCM_MUSIC_U=${NCM_MUSIC_U}
       - COOKIE_PATH=/data/cookie
+      # 区域解锁:开启后后端自动注入随机中国 IP(realIP),解掉海外变灰的有版权歌
+      - REGION_UNLOCK=${REGION_UNLOCK:-false}
     volumes:
       - cookie-data:/data
     restart: unless-stopped

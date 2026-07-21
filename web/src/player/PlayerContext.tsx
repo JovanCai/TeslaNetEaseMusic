@@ -110,8 +110,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
     ;(async () => {
       try {
-        const realIP = (import.meta.env.VITE_REAL_IP as string) || undefined
-        const [song, lyric] = await Promise.all([getSongUrl(current.id, realIP), getLyric(current.id)])
+        const [song, lyric] = await Promise.all([getSongUrl(current.id), getLyric(current.id)])
         if (cancelled) return
         dispatch({ type: 'setLrc', lrc: lyric.lrc, pureMusic: lyric.pureMusic })
         if (song.url) {

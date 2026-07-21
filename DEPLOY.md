@@ -117,7 +117,7 @@ docker compose up -d --build
 
 ## 常见问题
 
-- **改了 `VITE_REAL_IP` 没生效**:它在构建时嵌入,改后要 `docker compose up -d --build` 重新构建。
+- **开区域解锁 / 灰歌解锁**:在 `.env` 设 `REGION_UNLOCK=true` 或 `ENABLE_UNBLOCK=true`,`docker compose up -d`(运行时生效,不必重建)。
 - **换账号 / cookie 过期**:`docker compose exec app rm -f /data/cookie && docker compose restart app`,再打开页面扫码。(Mac 上直接 `./relogin.sh`。)
 - **车机打不开地址**:确认用的是 https 地址(隧道或 Caddy 给的),车机对纯 http 比较敏感。
 - **升级版本**:`git pull && docker compose up -d --build`,cookie 在数据卷里不受影响。
