@@ -1,31 +1,56 @@
 import { createContext, useCallback, useContext, useEffect, useReducer, useRef, type ReactNode } from 'react'
-import { nextIndex, prevIndex, type Repeat } from './queue'
+import { nextIndex, prevIndex, buildShuffleOrder, type Repeat } from './queue'
 import { getSongUrl, getLyric, type Song } from '../api'
 import { useAudio } from './useAudio'
+import { requestWakeLock } from './wakeLock'
 
 export type { Song }
 export interface PlayerState {
-  queue: Song[]; index: number; isPlaying: boolean; shuffle: boolean; repeat: Repeat; lrc: string
+  queue: Song[]
+  order: number[]   // 播放顺序:queue 下标的排列
+  pos: number       // order 中的当前位置;-1 表示无
+  isPlaying: boolean
+  shuffle: boolean
+  repeat: Repeat
+  lrc: string
+  playToken: number // 递增以强制(重新)加载当前曲(支持单曲循环重放)
 }
 export const initialPlayerState: PlayerState = {
-  queue: [], index: -1, isPlaying: false, shuffle: false, repeat: 'off', lrc: '',
+  queue: [], order: [], pos: -1, isPlaying: false, shuffle: false, repeat: 'off', lrc: '', playToken: 0,
 }
 type Action =
   | { type: 'playList'; songs: Song[]; start: number }
-  | { type: 'toggle' } | { type: 'next' } | { type: 'prev' }
+  | { type: 'toggle' } | { type: 'next' } | { type: 'prev' } | { type: 'stop' }
   | { type: 'setShuffle'; on: boolean } | { type: 'cycleRepeat' }
   | { type: 'setLrc'; lrc: string }
 
+const identity = (n: number) => Array.from({ length: n }, (_, i) => i)
+const curQueueIndex = (s: PlayerState) => (s.pos >= 0 ? s.order[s.pos] : -1)
+
 export function playerReducer(s: PlayerState, a: Action): PlayerState {
   switch (a.type) {
-    case 'playList': return { ...s, queue: a.songs, index: a.start, isPlaying: true, lrc: '' }
-    case 'toggle': return { ...s, isPlaying: !s.isPlaying }
-    case 'next': {
-      const i = nextIndex(s.queue.length, s.index, s.repeat)
-      return i < 0 ? { ...s, isPlaying: false } : { ...s, index: i, isPlaying: true, lrc: '' }
+    case 'playList': {
+      const order = s.shuffle ? buildShuffleOrder(a.songs.length, a.start) : identity(a.songs.length)
+      const pos = s.shuffle ? 0 : a.start
+      return { ...s, queue: a.songs, order, pos, isPlaying: true, lrc: '', playToken: s.playToken + 1 }
     }
-    case 'prev': return { ...s, index: prevIndex(s.queue.length, s.index), lrc: '' }
-    case 'setShuffle': return { ...s, shuffle: a.on }
+    case 'toggle': return { ...s, isPlaying: !s.isPlaying }
+    case 'stop': return { ...s, isPlaying: false }
+    case 'next': {
+      const p = nextIndex(s.order.length, s.pos, s.repeat)
+      return p < 0 ? { ...s, isPlaying: false } : { ...s, pos: p, isPlaying: true, lrc: '', playToken: s.playToken + 1 }
+    }
+    case 'prev': {
+      const p = prevIndex(s.order.length, s.pos)
+      return { ...s, pos: p, lrc: '', playToken: s.playToken + 1 }
+    }
+    case 'setShuffle': {
+      const cur = curQueueIndex(s)
+      if (cur < 0) return { ...s, shuffle: a.on, order: identity(s.queue.length), pos: -1 }
+      const order = a.on ? buildShuffleOrder(s.queue.length, cur) : identity(s.queue.length)
+      const pos = a.on ? 0 : cur
+      return { ...s, shuffle: a.on, order, pos } // 仅重排后续,不重启当前曲(不动 playToken)
+    }
     case 'cycleRepeat': {
       const order: Repeat[] = ['off', 'all', 'one']
       return { ...s, repeat: order[(order.indexOf(s.repeat) + 1) % 3] }
@@ -47,21 +72,37 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(playerReducer, initialPlayerState)
   const handleEnded = useCallback(() => dispatch({ type: 'next' }), [])
   const { play, pause, resume, seek, currentMs, durationMs } = useAudio(handleEnded)
-  const current = state.index >= 0 ? state.queue[state.index] : null
+  const qi = curQueueIndex(state)
+  const current = qi >= 0 ? state.queue[qi] : null
+  const skipRef = useRef(0)
 
   useEffect(() => {
     if (!current) return
     let cancelled = false
+    const advanceAfterUnplayable = () => {
+      skipRef.current += 1
+      if (skipRef.current < state.queue.length) dispatch({ type: 'next' })
+      else { skipRef.current = 0; dispatch({ type: 'stop' }) }
+    }
     ;(async () => {
-      const realIP = (import.meta.env.VITE_REAL_IP as string) || undefined
-      const [song, lyric] = await Promise.all([getSongUrl(current.id, realIP), getLyric(current.id)])
-      if (cancelled) return
-      dispatch({ type: 'setLrc', lrc: lyric.lrc })
-      if (song.url) await play(song.url)
-      else dispatch({ type: 'next' })
+      try {
+        const realIP = (import.meta.env.VITE_REAL_IP as string) || undefined
+        const [song, lyric] = await Promise.all([getSongUrl(current.id, realIP), getLyric(current.id)])
+        if (cancelled) return
+        dispatch({ type: 'setLrc', lrc: lyric.lrc })
+        if (song.url) {
+          skipRef.current = 0
+          requestWakeLock()
+          await play(song.url)
+        } else {
+          advanceAfterUnplayable()
+        }
+      } catch {
+        if (!cancelled) advanceAfterUnplayable()
+      }
     })()
     return () => { cancelled = true }
-  }, [current?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [state.playToken]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const firstRun = useRef(true)
   useEffect(() => {

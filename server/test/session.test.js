@@ -38,4 +38,9 @@ describe('sessionRouter', () => {
     expect(store.write).not.toHaveBeenCalled()
     expect(res.body).toEqual({ code: 801, loggedIn: false })
   })
+  it('上游异常时返回 502 而非挂起', async () => {
+    const app = makeApp({ status: () => ({ loggedIn: false }) }, () => { throw new Error('down') })
+    const res = await request(app).post('/session/qr/key')
+    expect(res.status).toBe(502)
+  })
 })

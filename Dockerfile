@@ -3,7 +3,6 @@ WORKDIR /web
 COPY web/package*.json ./
 RUN npm ci
 COPY web/ ./
-ARG VITE_DEMO_SONG_ID
 ARG VITE_REAL_IP
 RUN npm run build
 

@@ -8,7 +8,6 @@ services:
     build:
       context: .
       args:
-        VITE_DEMO_SONG_ID: ${VITE_DEMO_SONG_ID}
         VITE_REAL_IP: ${VITE_REAL_IP}
     depends_on: [ncm-api]
     ports: ["80:80"]
