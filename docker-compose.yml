@@ -2,7 +2,8 @@ services:
   ncm-api:
     image: moefurina/ncm-api:latest
     environment:
-      - ENABLE_GENERAL_UNBLOCK=false
+      # 灰歌解锁(从 QQ/酷狗/酷我/咪咕等找同名歌替换)。默认关;.env 设 ENABLE_UNBLOCK=true 开启。
+      - ENABLE_GENERAL_UNBLOCK=${ENABLE_UNBLOCK:-false}
     restart: unless-stopped
   app:
     build:
