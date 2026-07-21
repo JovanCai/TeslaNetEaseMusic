@@ -8,6 +8,12 @@
 - 卡拉OK式滚动歌词,纯音乐会显示“纯音乐 · 请欣赏”
 - 大按钮、深色高对比,方便车上点;记住上次听的歌和音量
 
+## 界面
+
+| 首页 · 私人FM | 播放页 · 滚动歌词 | 我的歌单 |
+|---|---|---|
+| ![首页](docs/screenshots/home.png) | ![播放页](docs/screenshots/player.png) | ![歌单](docs/screenshots/playlists.png) |
+
 ---
 
 ## 怎么跑起来
