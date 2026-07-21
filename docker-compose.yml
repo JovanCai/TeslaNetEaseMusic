@@ -19,12 +19,22 @@ services:
       - cookie-data:/data
     restart: unless-stopped
 
-  # 可选:Cloudflare 隧道(公网 https 地址,无需公网 IP)。
-  # 在 .env 填 CLOUDFLARE_TUNNEL_TOKEN 后,用 --profile tunnel 启动即生效。
+  # 可选一:固定地址的 Cloudflare 隧道(需要一个加到 Cloudflare 的域名)。
+  # 在 .env 填 CLOUDFLARE_TUNNEL_TOKEN 后:docker compose --profile tunnel up -d
   cloudflared:
     image: cloudflare/cloudflared:latest
     profiles: ["tunnel"]
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on: [app]
+    restart: unless-stopped
+
+  # 可选二:免域名的快速隧道(给一个临时 https 地址,重启才会变)。
+  # 启动:docker compose --profile quick up -d
+  # 拿地址:docker compose logs cloudflared-quick | grep trycloudflare
+  cloudflared-quick:
+    image: cloudflare/cloudflared:latest
+    profiles: ["quick"]
+    command: tunnel --no-autoupdate --url http://app:80
     depends_on: [app]
     restart: unless-stopped
 

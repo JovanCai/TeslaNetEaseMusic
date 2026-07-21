@@ -54,29 +54,32 @@ cp .env.example .env
 #   APP_PORT=8920
 ```
 
-### 3) 在 Cloudflare 建一个隧道,拿到 token
-1. 登录 [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → **Networks → Tunnels → Create a tunnel** → 选 **Cloudflared**。
-2. 给隧道起个名,创建后它会显示一个 **token**(一长串)。复制它。
-3. 在 **Public Hostname** 里添加一条:
+### 3) 选一种上网方式
+
+**不想买域名 → 快速隧道(免费,地址临时但群晖常开时基本不变)**
+```bash
+docker compose --profile quick up -d --build
+# 等十几秒,拿地址:
+docker compose logs cloudflared-quick | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com'
+```
+把打印出来的 `https://xxxx.trycloudflare.com` 在特斯拉浏览器打开。群晖重启后地址会变,重新看一次日志即可。
+
+**想要固定地址(如 `music.你的域名.com`)→ 命名隧道(需要一个加到 Cloudflare 的域名)**
+1. 登录 [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → **Networks → Tunnels → Create a tunnel** → 选 **Cloudflared** → 起个名 → **Next**。
+2. 到 **Install and Run** 这步:页面给的安装命令里,`service install` 后面那串
+   `eyJhIjoi……` 就是 **token**。**只复制这串 token**,不用下载运行那个安装程序(我们用 Docker 跑)。
+3. 点 **Next** 到 **Route Tunnel / Public Hostname**:
    - Subdomain 填 `music`(随意),Domain 选你的域名 → 得到 `music.你的域名.com`
-   - Service 选 **HTTP**,地址填 `app:80`
+   - Type 选 **HTTP**,URL 填 `app:80` → 保存。
+4. 把 token 填进 `.env`:`CLOUDFLARE_TUNNEL_TOKEN=粘贴那串token`,然后:
+   ```bash
+   docker compose --profile tunnel up -d --build
+   ```
 
-把 token 填进 `.env`:
-```bash
-CLOUDFLARE_TUNNEL_TOKEN=粘贴你的token
-```
+### 4) 登录一次
+浏览器打开你的地址(快速隧道地址 / `https://music.你的域名.com` / 或群晖局域网 `http://群晖IP:APP_PORT`),用手机扫码登录。cookie 存进数据卷,以后免登录、群晖重启也不丢。
 
-### 4) 启动(带隧道)
-```bash
-docker compose --profile tunnel up -d --build
-```
-
-### 5) 登录一次
-浏览器打开 `https://music.你的域名.com`(或群晖局域网地址 `http://群晖IP:8920`),用手机扫码登录。cookie 存进数据卷,以后免登录、群晖重启也不丢。
-
-之后特斯拉固定访问 `https://music.你的域名.com` 就行。
-
-> 用 Container Manager 图形界面也可以:把项目建成一个“项目(Project)”,选中 `docker-compose.yml`,并在环境变量里填好 `.env` 的内容。命令行更省事。
+> 用 Container Manager 图形界面也行:把项目建成一个“项目(Project)”,选 `docker-compose.yml`,环境变量里填好 `.env` 的内容;命令行更省事。
 
 ---
 
