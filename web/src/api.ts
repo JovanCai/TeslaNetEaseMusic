@@ -11,11 +11,11 @@ export async function getSongUrl(id: number, realIP?: string): Promise<{ id: num
   return { id, url: raw ? raw.replace(/^http:\/\//, 'https://') : null }
 }
 
-export async function getLyric(id: number): Promise<{ lrc: string; tlyric: string }> {
+export async function getLyric(id: number): Promise<{ lrc: string; tlyric: string; pureMusic: boolean }> {
   const r = await fetch(`${BASE}/lyric?id=${id}`)
   if (!r.ok) throw new Error(`lyric ${r.status}`)
   const j: any = await r.json()
-  return { lrc: j?.lrc?.lyric ?? '', tlyric: j?.tlyric?.lyric ?? '' }
+  return { lrc: j?.lrc?.lyric ?? '', tlyric: j?.tlyric?.lyric ?? '', pureMusic: !!j?.pureMusic }
 }
 
 export interface Song { id: number; name: string; artist: string; cover: string }

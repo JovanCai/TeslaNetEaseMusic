@@ -33,7 +33,11 @@ describe('getSongUrl', () => {
 describe('getLyric', () => {
   it('解析 lrc 与 tlyric', async () => {
     vi.stubGlobal('fetch', mockFetch({ lrc: { lyric: 'L' }, tlyric: { lyric: 'T' } }))
-    expect(await getLyric(5)).toEqual({ lrc: 'L', tlyric: 'T' })
+    expect(await getLyric(5)).toEqual({ lrc: 'L', tlyric: 'T', pureMusic: false })
+  })
+  it('标记纯音乐', async () => {
+    vi.stubGlobal('fetch', mockFetch({ pureMusic: true, lrc: { lyric: '[00:05.00]纯音乐，请欣赏' } }))
+    expect((await getLyric(5)).pureMusic).toBe(true)
   })
 })
 

@@ -13,16 +13,17 @@ export interface PlayerState {
   shuffle: boolean
   repeat: Repeat
   lrc: string
+  pureMusic: boolean
   playToken: number // 递增以强制(重新)加载当前曲(支持单曲循环重放)
 }
 export const initialPlayerState: PlayerState = {
-  queue: [], order: [], pos: -1, isPlaying: false, shuffle: false, repeat: 'off', lrc: '', playToken: 0,
+  queue: [], order: [], pos: -1, isPlaying: false, shuffle: false, repeat: 'off', lrc: '', pureMusic: false, playToken: 0,
 }
 type Action =
   | { type: 'playList'; songs: Song[]; start: number }
   | { type: 'toggle' } | { type: 'next' } | { type: 'prev' } | { type: 'stop' }
   | { type: 'setShuffle'; on: boolean } | { type: 'cycleRepeat' }
-  | { type: 'setLrc'; lrc: string }
+  | { type: 'setLrc'; lrc: string; pureMusic: boolean }
 
 const identity = (n: number) => Array.from({ length: n }, (_, i) => i)
 const curQueueIndex = (s: PlayerState) => (s.pos >= 0 ? s.order[s.pos] : -1)
@@ -32,17 +33,17 @@ export function playerReducer(s: PlayerState, a: Action): PlayerState {
     case 'playList': {
       const order = s.shuffle ? buildShuffleOrder(a.songs.length, a.start) : identity(a.songs.length)
       const pos = s.shuffle ? 0 : a.start
-      return { ...s, queue: a.songs, order, pos, isPlaying: true, lrc: '', playToken: s.playToken + 1 }
+      return { ...s, queue: a.songs, order, pos, isPlaying: true, lrc: '', pureMusic: false, playToken: s.playToken + 1 }
     }
     case 'toggle': return { ...s, isPlaying: !s.isPlaying }
     case 'stop': return { ...s, isPlaying: false }
     case 'next': {
       const p = nextIndex(s.order.length, s.pos, s.repeat)
-      return p < 0 ? { ...s, isPlaying: false } : { ...s, pos: p, isPlaying: true, lrc: '', playToken: s.playToken + 1 }
+      return p < 0 ? { ...s, isPlaying: false } : { ...s, pos: p, isPlaying: true, lrc: '', pureMusic: false, playToken: s.playToken + 1 }
     }
     case 'prev': {
       const p = prevIndex(s.order.length, s.pos)
-      return { ...s, pos: p, lrc: '', playToken: s.playToken + 1 }
+      return { ...s, pos: p, lrc: '', pureMusic: false, playToken: s.playToken + 1 }
     }
     case 'setShuffle': {
       const cur = curQueueIndex(s)
@@ -55,7 +56,7 @@ export function playerReducer(s: PlayerState, a: Action): PlayerState {
       const order: Repeat[] = ['off', 'all', 'one']
       return { ...s, repeat: order[(order.indexOf(s.repeat) + 1) % 3] }
     }
-    case 'setLrc': return { ...s, lrc: a.lrc }
+    case 'setLrc': return { ...s, lrc: a.lrc, pureMusic: a.pureMusic }
     default: return s
   }
 }
@@ -89,7 +90,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         const realIP = (import.meta.env.VITE_REAL_IP as string) || undefined
         const [song, lyric] = await Promise.all([getSongUrl(current.id, realIP), getLyric(current.id)])
         if (cancelled) return
-        dispatch({ type: 'setLrc', lrc: lyric.lrc })
+        dispatch({ type: 'setLrc', lrc: lyric.lrc, pureMusic: lyric.pureMusic })
         if (song.url) {
           skipRef.current = 0
           requestWakeLock()
