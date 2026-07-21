@@ -1,8 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useReducer, useRef, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
 import { nextIndex, prevIndex, buildShuffleOrder, type Repeat } from './queue'
 import { getSongUrl, getLyric, getPersonalFm, type Song } from '../api'
 import { useAudio } from './useAudio'
 import { requestWakeLock } from './wakeLock'
+import { loadPersisted, savePersisted } from './persist'
 
 export type { Song }
 export interface PlayerState {
@@ -81,12 +82,23 @@ interface PlayerValue extends PlayerState {
 const Ctx = createContext<PlayerValue | null>(null)
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(playerReducer, initialPlayerState)
+  const [boot] = useState(() => loadPersisted())
+  const [state, dispatch] = useReducer(playerReducer, initialPlayerState, (init) =>
+    boot ? { ...init, queue: boot.queue, order: boot.order, pos: boot.pos, shuffle: boot.shuffle, repeat: boot.repeat, radar: boot.radar } : init)
   const handleEnded = useCallback(() => dispatch({ type: 'next' }), [])
-  const { play, pause, resume, seek, setVolume, currentMs, durationMs, volume } = useAudio(handleEnded)
+  const { load, play, pause, seek, setVolume, currentMs, durationMs, volume } = useAudio(handleEnded, boot?.volume ?? 1)
   const qi = curQueueIndex(state)
   const current = qi >= 0 ? state.queue[qi] : null
   const skipRef = useRef(0)
+
+  // 用 ref 读取最新 isPlaying:异步取到播放地址时决定是否立即播放(恢复态默认不播,等用户按播放)
+  const isPlayingRef = useRef(state.isPlaying)
+  isPlayingRef.current = state.isPlaying
+
+  // 持久化:队列/顺序/位置/设置/音量变化时写入(不含播放进度)
+  useEffect(() => {
+    savePersisted({ queue: state.queue, order: state.order, pos: state.pos, shuffle: state.shuffle, repeat: state.repeat, radar: state.radar, volume })
+  }, [state.queue, state.order, state.pos, state.shuffle, state.repeat, state.radar, volume])
 
   useEffect(() => {
     if (!current) return
@@ -104,13 +116,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'setLrc', lrc: lyric.lrc, pureMusic: lyric.pureMusic })
         if (song.url) {
           skipRef.current = 0
-          requestWakeLock()
-          await play(song.url)
-        } else {
+          load(song.url)
+          if (isPlayingRef.current) { requestWakeLock(); play().catch(() => {}) }
+        } else if (isPlayingRef.current) {
           advanceAfterUnplayable()
         }
       } catch {
-        if (!cancelled) advanceAfterUnplayable()
+        if (!cancelled && isPlayingRef.current) advanceAfterUnplayable()
       }
     })()
     return () => { cancelled = true }
@@ -119,7 +131,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const firstRun = useRef(true)
   useEffect(() => {
     if (firstRun.current) { firstRun.current = false; return }
-    state.isPlaying ? resume() : pause()
+    state.isPlaying ? play().catch(() => {}) : pause()
   }, [state.isPlaying]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 私人FM:接近队尾时预取下一批,形成无限流

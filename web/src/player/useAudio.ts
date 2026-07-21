@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 
-export function useAudio(onEnded?: () => void) {
-  const [audio] = useState(() => new Audio())
+export function useAudio(onEnded?: () => void, initialVolume = 1) {
+  const [audio] = useState(() => { const a = new Audio(); a.volume = initialVolume; return a })
   const [currentMs, setCurrentMs] = useState(0)
   const [durationMs, setDurationMs] = useState(0)
-  const [volume, setVolumeState] = useState(1)
+  const [volume, setVolumeState] = useState(initialVolume)
 
   useEffect(() => {
     const onTime = () => setCurrentMs(audio.currentTime * 1000)
@@ -20,13 +20,10 @@ export function useAudio(onEnded?: () => void) {
     }
   }, [audio, onEnded])
 
-  async function play(url: string) {
-    if (audio.src !== url) audio.src = url
-    await audio.play()
-  }
+  function load(url: string) { if (audio.src !== url) audio.src = url }
+  function play() { return audio.play() }        // 播放当前 src
   function pause() { audio.pause() }
-  function resume() { audio.play().catch(() => {}) }
   function seek(ms: number) { audio.currentTime = ms / 1000 }
   function setVolume(v: number) { audio.volume = v; setVolumeState(v) }
-  return { play, pause, resume, seek, setVolume, currentMs, durationMs, volume }
+  return { load, play, pause, seek, setVolume, currentMs, durationMs, volume }
 }
