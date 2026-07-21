@@ -1,0 +1,27 @@
+:root {
+  --bg:#0a0b12; --bg-2:#0f1220; --surface:rgba(255,255,255,.04);
+  --border:rgba(120,200,255,.12); --cyan:#22d3ee; --purple:#a855f7;
+  --text:#e6edf3; --text-2:#8b97a7;
+}
+body {
+  margin:0;
+  background:
+    radial-gradient(1200px 600px at 70% -10%, rgba(34,211,238,.08), transparent),
+    linear-gradient(180deg, var(--bg), var(--bg-2));
+  background-attachment: fixed;
+  color:var(--text);
+  font-family: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+.glass {
+  background:var(--surface);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  border:1px solid var(--border);
+  border-radius:16px;
+}
+.neon-text { color:var(--cyan); text-shadow:0 0 12px rgba(34,211,238,.6); }
+.tap {
+  min-height:64px;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; user-select:none;
+}

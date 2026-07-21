@@ -1,6 +1,8 @@
-.app { min-height: 100vh; background: #0a0a0a; color: #eee; display: flex; flex-direction: column; align-items: center; }
-.start { font-size: 2.5rem; padding: 1.5rem 3rem; margin: 20vh 0; border-radius: 1rem; background: #c20c0c; color: #fff; border: 0; }
-.lyrics { text-align: center; font-size: 1.8rem; line-height: 2.6; padding: 40vh 0; }
-.line { opacity: .45; transition: opacity .3s; }
-.line.active { opacity: 1; font-weight: 700; font-size: 2.2rem; color: #fff; }
-.lyrics-empty, .err { font-size: 1.5rem; opacity: .7; margin-top: 30vh; }
+.app { min-height:100vh; display:flex; flex-direction:column; align-items:center; }
+.start { font-size:2rem; padding:1.25rem 2.5rem; margin:18vh 0; border-radius:16px;
+  background:linear-gradient(90deg,var(--cyan),var(--purple)); color:#00121a; border:0; font-weight:700;
+  box-shadow:0 0 30px rgba(34,211,238,.35); }
+.lyrics { text-align:center; font-size:1.6rem; line-height:2.6; padding:38vh 0; }
+.line { opacity:.4; transition:opacity .3s, text-shadow .3s; }
+.line.active { opacity:1; font-weight:700; font-size:2rem; color:var(--cyan); text-shadow:0 0 14px rgba(34,211,238,.6); }
+.lyrics-empty,.err { font-size:1.3rem; color:var(--text-2); margin-top:28vh; }
