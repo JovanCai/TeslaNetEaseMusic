@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useReducer, useRef, type ReactNode } from 'react'
 import { nextIndex, prevIndex, type Repeat } from './queue'
-import { getSongUrl, getLyric } from '../api'
+import { getSongUrl, getLyric, type Song } from '../api'
 import { useAudio } from './useAudio'
 
-export interface Song { id: number; name: string; artist: string; cover: string }
+export type { Song }
 export interface PlayerState {
   queue: Song[]; index: number; isPlaying: boolean; shuffle: boolean; repeat: Repeat; lrc: string
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { getSongUrl, getLyric } from './api'
+import { getSongUrl, getLyric, getDailySongs, search, getUserPlaylists } from './api'
 
 function mockFetch(json: unknown) {
   return vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(json) })
@@ -34,5 +34,26 @@ describe('getLyric', () => {
   it('解析 lrc 与 tlyric', async () => {
     vi.stubGlobal('fetch', mockFetch({ lrc: { lyric: 'L' }, tlyric: { lyric: 'T' } }))
     expect(await getLyric(5)).toEqual({ lrc: 'L', tlyric: 'T' })
+  })
+})
+
+describe('getDailySongs', () => {
+  it('归一化 dailySongs', async () => {
+    vi.stubGlobal('fetch', mockFetch({ data: { dailySongs: [
+      { id: 7, name: 'S', ar: [{ name: 'A' }], al: { picUrl: 'p' } }] } }))
+    expect(await getDailySongs()).toEqual([{ id: 7, name: 'S', artist: 'A', cover: 'p' }])
+  })
+})
+describe('search', () => {
+  it('归一化 result.songs', async () => {
+    vi.stubGlobal('fetch', mockFetch({ result: { songs: [
+      { id: 9, name: 'T', ar: [{ name: 'B' }], al: { picUrl: 'q' } }] } }))
+    const r = await search('x'); expect(r[0]).toEqual({ id: 9, name: 'T', artist: 'B', cover: 'q' })
+  })
+})
+describe('getUserPlaylists', () => {
+  it('映射歌单概要', async () => {
+    vi.stubGlobal('fetch', mockFetch({ playlist: [{ id: 1, name: 'PL', coverImgUrl: 'c', trackCount: 5 }] }))
+    expect(await getUserPlaylists(42)).toEqual([{ id: 1, name: 'PL', cover: 'c', count: 5 }])
   })
 })

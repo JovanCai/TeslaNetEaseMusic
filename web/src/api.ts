@@ -17,3 +17,43 @@ export async function getLyric(id: number): Promise<{ lrc: string; tlyric: strin
   const j: any = await r.json()
   return { lrc: j?.lrc?.lyric ?? '', tlyric: j?.tlyric?.lyric ?? '' }
 }
+
+export interface Song { id: number; name: string; artist: string; cover: string }
+
+function toSong(r: any): Song {
+  const ar = r.ar ?? r.artists ?? []
+  const al = r.al ?? r.album ?? {}
+  return { id: r.id, name: r.name, artist: ar[0]?.name ?? '', cover: al.picUrl ?? '' }
+}
+
+async function getJson(path: string): Promise<any> {
+  const r = await fetch(`${BASE}${path}`)
+  if (!r.ok) throw new Error(`${path} ${r.status}`)
+  return r.json()
+}
+
+export async function getDailySongs(): Promise<Song[]> {
+  const j = await getJson('/recommend/songs')
+  return (j?.data?.dailySongs ?? []).map(toSong)
+}
+
+export async function getPlaylistTracks(id: number): Promise<Song[]> {
+  const j = await getJson(`/playlist/track/all?id=${id}&limit=200`)
+  return (j?.songs ?? []).map(toSong)
+}
+
+export async function search(keywords: string): Promise<Song[]> {
+  const j = await getJson(`/cloudsearch?keywords=${encodeURIComponent(keywords)}&limit=30`)
+  return (j?.result?.songs ?? []).map(toSong)
+}
+
+export async function getUserPlaylists(uid: number): Promise<{ id: number; name: string; cover: string; count: number }[]> {
+  const j = await getJson(`/user/playlist?uid=${uid}&limit=60`)
+  return (j?.playlist ?? []).map((p: any) => ({ id: p.id, name: p.name, cover: p.coverImgUrl ?? '', count: p.trackCount ?? 0 }))
+}
+
+export async function getLoginStatus(): Promise<{ loggedIn: boolean; uid: number | null; nickname: string | null }> {
+  const j = await getJson('/login/status')
+  const prof = j?.data?.profile
+  return { loggedIn: !!prof, uid: prof?.userId ?? null, nickname: prof?.nickname ?? null }
+}
