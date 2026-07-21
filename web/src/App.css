@@ -1,8 +1,27 @@
-.app { min-height:100vh; display:flex; flex-direction:column; align-items:center; }
-.start { font-size:2rem; padding:1.25rem 2.5rem; margin:18vh 0; border-radius:16px;
-  background:linear-gradient(90deg,var(--cyan),var(--purple)); color:#00121a; border:0; font-weight:700;
-  box-shadow:0 0 30px rgba(34,211,238,.35); }
-.lyrics { text-align:center; font-size:1.6rem; line-height:2.6; padding:38vh 0; }
-.line { opacity:.4; transition:opacity .3s, text-shadow .3s; }
-.line.active { opacity:1; font-weight:700; font-size:2rem; color:var(--cyan); text-shadow:0 0 14px rgba(34,211,238,.6); }
-.lyrics-empty,.err { font-size:1.3rem; color:var(--text-2); margin-top:28vh; }
+.shell { min-height:100vh; }
+.content { padding:16px 16px 180px; max-width:900px; margin:0 auto; }
+.view-title { margin:8px 4px 16px; font-size:1.6rem; }
+.back-btn { display:inline-flex; padding:0 16px; color:var(--text-2); background:none; border:0; margin-bottom:8px; }
+
+.song-list { display:flex; flex-direction:column; }
+.song-row { justify-content:flex-start; gap:12px; padding:8px; border-radius:12px; }
+.song-row:active { background:var(--surface); }
+.song-cover { width:52px; height:52px; border-radius:10px; }
+.song-name { font-weight:600; }
+.song-artist { color:var(--text-2); font-size:.9rem; }
+
+.pl-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.pl-card { flex-direction:column; padding:12px; align-items:flex-start; }
+.pl-cover { width:100%; aspect-ratio:1; border-radius:12px; object-fit:cover; }
+.pl-name { font-weight:600; margin-top:8px; }
+.pl-count { color:var(--text-2); font-size:.85rem; }
+
+.search-bar { display:flex; gap:8px; margin-bottom:16px; }
+.search-input { flex:1; height:64px; border-radius:14px; border:1px solid var(--border);
+  background:var(--surface); color:var(--text); font-size:1.2rem; padding:0 16px; }
+.search-go { padding:0 24px; border-radius:14px; border:0; font-weight:700;
+  background:linear-gradient(90deg,var(--cyan),var(--purple)); color:#00121a; }
+
+.tabbar { position:fixed; left:12px; right:12px; bottom:12px; display:flex; height:72px; z-index:20; }
+.tabbtn { flex:1; font-size:1.3rem; color:var(--text-2); }
+.tabbtn.active { color:var(--cyan); text-shadow:0 0 12px rgba(34,211,238,.6); }

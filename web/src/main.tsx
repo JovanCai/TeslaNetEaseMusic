@@ -3,9 +3,12 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import './ui/theme.css'
 import App from './App.tsx'
+import { PlayerProvider } from './player/PlayerContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <PlayerProvider>
+      <App />
+    </PlayerProvider>
   </StrictMode>,
 )

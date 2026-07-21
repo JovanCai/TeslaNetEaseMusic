@@ -1,46 +1,25 @@
-import { useMemo, useState } from 'react'
-import { getSongUrl, getLyric } from './api'
-import { parseLrc, getCurrentLineIndex } from './lyrics/parseLrc'
-import { LyricsView } from './lyrics/LyricsView'
-import { useAudio } from './player/useAudio'
-import { requestWakeLock } from './player/wakeLock'
+import { useState } from 'react'
+import { TabBar } from './components/TabBar'
+import { Daily } from './views/Daily'
+import { Playlists } from './views/Playlists'
+import { Search } from './views/Search'
+import { MiniPlayer } from './player/MiniPlayer'
+import { NowPlaying } from './player/NowPlaying'
 import './App.css'
 
-const SONG_ID = Number(import.meta.env.VITE_DEMO_SONG_ID ?? 0)
-const REAL_IP = import.meta.env.VITE_REAL_IP || undefined
-
 export default function App() {
-  const { play, currentMs } = useAudio()
-  const [started, setStarted] = useState(false)
-  const [lrc, setLrc] = useState('')
-  const [err, setErr] = useState('')
-  const lines = useMemo(() => parseLrc(lrc), [lrc])
-  const active = getCurrentLineIndex(lines, currentMs)
-
-  async function start() {
-    setErr('')
-    setStarted(true)
-    try {
-      await requestWakeLock()
-      const [song, lyric] = await Promise.all([getSongUrl(SONG_ID, REAL_IP), getLyric(SONG_ID)])
-      if (!song.url) {
-        setErr('无法获取播放地址(账号无版权、音质等级不可用,或需开启区域解锁)')
-        setStarted(false)
-        return
-      }
-      setLrc(lyric.lrc)
-      await play(song.url)
-    } catch (e) {
-      setErr(String(e))
-      setStarted(false)
-    }
-  }
-
+  const [tab, setTab] = useState('daily')
+  const [showNP, setShowNP] = useState(false)
   return (
-    <main className="app">
-      {!started && <button className="start" onClick={start}>开始播放</button>}
-      {err && <p className="err">{err}</p>}
-      <LyricsView lines={lines} activeIndex={active} />
-    </main>
+    <div className="shell">
+      <main className="content">
+        {tab === 'daily' && <Daily />}
+        {tab === 'playlists' && <Playlists />}
+        {tab === 'search' && <Search />}
+      </main>
+      <MiniPlayer onExpand={() => setShowNP(true)} />
+      <TabBar tab={tab} onTab={setTab} />
+      {showNP && <NowPlaying onClose={() => setShowNP(false)} />}
+    </div>
   )
 }
