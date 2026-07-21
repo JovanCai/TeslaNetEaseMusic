@@ -4,13 +4,20 @@ services:
     environment:
       - ENABLE_GENERAL_UNBLOCK=false
     restart: unless-stopped
-  web:
-    image: nginx:alpine
+  app:
+    build:
+      context: .
+      args:
+        VITE_DEMO_SONG_ID: ${VITE_DEMO_SONG_ID}
+        VITE_REAL_IP: ${VITE_REAL_IP}
     depends_on: [ncm-api]
     ports: ["80:80"]
     environment:
+      - NCM_BASE=http://ncm-api:3000
       - NCM_MUSIC_U=${NCM_MUSIC_U}
+      - COOKIE_PATH=/data/cookie
     volumes:
-      - ./web/dist:/usr/share/nginx/html:ro
-      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - cookie-data:/data
     restart: unless-stopped
+volumes:
+  cookie-data:
