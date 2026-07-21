@@ -25,12 +25,13 @@
 .play-all:active, .play-shuffle:active { transform:scale(.94); }
 .play-all:disabled, .play-shuffle:disabled { opacity:.5; }
 
-.song-list { display:flex; flex-direction:column; }
+.song-list { display:block; }
 .song-row { justify-content:flex-start; gap:12px; padding:10px 8px; border-radius:12px; }
-.song-row:active { background:var(--surface); transform:scale(.985); }
-.song-cover { width:52px; height:52px; border-radius:10px; }
-.song-name { font-weight:600; }
-.song-artist { color:var(--text-2); font-size:.9rem; }
+.song-row:active { background:var(--surface); }
+.song-cover { width:52px; height:52px; border-radius:10px; flex-shrink:0; }
+.song-meta { min-width:0; }
+.song-name { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.song-artist { color:var(--text-2); font-size:.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
 .pl-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
 .pl-card { flex-direction:column; padding:12px; align-items:flex-start; }

@@ -43,8 +43,15 @@ export async function getPersonalFm(): Promise<Song[]> {
 }
 
 export async function getPlaylistTracks(id: number): Promise<Song[]> {
-  const j = await getJson(`/playlist/track/all?id=${id}&limit=200`)
-  return (j?.songs ?? []).map(toSong)
+  const PAGE = 1000
+  const all: Song[] = []
+  for (let offset = 0; offset < 10000; offset += PAGE) {
+    const j = await getJson(`/playlist/track/all?id=${id}&limit=${PAGE}&offset=${offset}`)
+    const songs = (j?.songs ?? []).map(toSong)
+    all.push(...songs)
+    if (songs.length < PAGE) break // 最后一页,取全了
+  }
+  return all
 }
 
 export async function search(keywords: string): Promise<Song[]> {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { getSongUrl, getLyric, getDailySongs, getPersonalFm, search, getUserPlaylists } from './api'
+import { getSongUrl, getLyric, getDailySongs, getPersonalFm, search, getUserPlaylists, getPlaylistTracks } from './api'
 
 function mockFetch(json: unknown) {
   return vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(json) })
@@ -66,5 +66,20 @@ describe('getUserPlaylists', () => {
   it('映射歌单概要', async () => {
     vi.stubGlobal('fetch', mockFetch({ playlist: [{ id: 1, name: 'PL', coverImgUrl: 'c', trackCount: 5 }] }))
     expect(await getUserPlaylists(42)).toEqual([{ id: 1, name: 'PL', cover: 'c', count: 5 }])
+  })
+})
+
+describe('getPlaylistTracks 分页', () => {
+  it('满页则继续翻页,直到不满一页(取全整张歌单)', async () => {
+    const fullPage = { songs: Array.from({ length: 1000 }, (_, i) => ({ id: i, name: 's', ar: [{ name: 'a' }], al: {} })) }
+    const lastPage = { songs: [{ id: 9999, name: 't', ar: [{ name: 'b' }], al: {} }] }
+    const f = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(fullPage) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(lastPage) })
+    vi.stubGlobal('fetch', f)
+    const r = await getPlaylistTracks(7)
+    expect(r).toHaveLength(1001)                         // 1000 + 1
+    expect(f).toHaveBeenCalledTimes(2)                   // 第二页不满即停
+    expect(f.mock.calls[1][0]).toContain('offset=1000')  // 第二页用 offset 翻页
   })
 })
