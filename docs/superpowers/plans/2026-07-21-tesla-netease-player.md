@@ -627,33 +627,42 @@ cd ~/tesla-music && git add nginx docker-compose.yml && git commit -m "feat: one
 
 ---
 
-### Task 8: 真车验证(阶段 0 的门,手动)
+### Task 8: 验证(阶段 0 的门,手动,分两段)
 
-> 这是决定阶段 1/2 是否照现设计推进的验收点。无代码,照单验证并记录结果。
+> 阶段 0 的验收点。拆两段:**8a 电脑 Chrome**(现在就做,验通用链路)、**8b 真车**(等在车上时做,验特斯拉硬件特有项)。
+> **重要:8a 通过 ≠ 门通过。** 决定阶段 1 是否照现设计推进的,是 8b;不得在 8b 未过时把阶段 1 建在"车机能放"的未验证假设上。
 
 **Files:**
-- Create: `docs/superpowers/car-validation-2026-07-21.md`(记录结果)
+- Create: `docs/superpowers/validation-2026-07-21.md`(记录 8a/8b 两段结果)
 
-- [ ] **Step 1: 让车机能访问到服务**
+#### 8a — 电脑 Chrome 验证(现在可做)
 
-把服务跑在车机可达的地址(家里 LAN 内一台机 + 手机热点让特斯拉连同一网络,或临时用 `cloudflared`/`ngrok` 暴露一个 https 域名——车机浏览器对 https 更友好)。
+- [ ] **Step 1: 本地起服务**:确保 Task 2 的 `ncm-api` 容器在跑并已拿到 cookie;`docker compose --env-file .env up -d`(或 `npm --prefix web run dev` + dev 代理)。
+- [ ] **Step 2: 在桌面 Chrome 逐项验证并记录**,打开 `http://localhost/` 点"开始播放":
+  - [ ] 页面加载、`/api` 代理通
+  - [ ] 用你的 cookie 能拿到非空播放地址
+  - [ ] 点击后能出声(电脑扬声器)
+  - [ ] 歌词逐行滚动且高亮当前行
+  - [ ] 点击手势与自动播放策略的实际表现(桌面 Chrome 与车机同为 Chromium,可作近似参考)
+- 说明:8a **验不了**车载扬声器路由、行驶中可用性、屏幕保活、老版 Chromium 的 API(如 wakeLock)支持——这些留给 8b。
 
-- [ ] **Step 2: 在真车上逐项验证并记录**
+#### 8b — 真车验证(等在车上时做,仍是门)
 
-在特斯拉浏览器打开该地址,点"开始播放",逐条记录:
-- [ ] 页面能加载(网络通路 OK)
-- [ ] 点击后**能出声**且走车载扬声器
-- [ ] 自动播放是否需要那一次点击(记录行为)
-- [ ] 歌词**逐行滚动**且高亮当前行
-- [ ] "播放"时屏幕**是否保持常亮**、浏览器是否被系统切走
-- [ ] 行驶中浏览器是否仍可用(安全前提下,副驾操作或低速验证)
+- [ ] **Step 1: 让车机能访问到服务**:跑在车机可达地址(家里 LAN + 手机热点让特斯拉连同一网络,或临时 `cloudflared`/`ngrok` 暴露 https 域名——车机浏览器对 https 更友好)。
+- [ ] **Step 2: 在真车上逐项验证并记录**,打开该地址点"开始播放":
+  - [ ] 页面能加载(车机网络通路 OK)
+  - [ ] 点击后**能出声**且走车载扬声器
+  - [ ] 自动播放是否需要那一次点击(记录行为)
+  - [ ] 歌词**逐行滚动**且高亮当前行
+  - [ ] "播放"时屏幕**是否保持常亮**、浏览器是否被系统切走
+  - [ ] 行驶中浏览器是否仍可用(安全前提下,副驾操作或低速验证)
 
-- [ ] **Step 3: 写结论**
+- [ ] **Step 3: 写结论并 commit**
 
-在 `car-validation-2026-07-21.md` 记录每项结果与异常;据此决定阶段 1 是否需要针对性调整(如自动播放策略、保活方案)。Commit。
+在 `validation-2026-07-21.md` 记录 8a/8b 每项结果与异常;据此决定阶段 1 是否需针对性调整(自动播放策略、保活方案)。
 
 ```bash
-cd ~/tesla-music && git add docs/superpowers/car-validation-2026-07-21.md && git commit -m "docs: real-car validation results (phase 0 gate)"
+cd ~/tesla-music && git add docs/superpowers/validation-2026-07-21.md && git commit -m "docs: validation results (phase 0 gate: chrome 8a + car 8b)"
 ```
 
 ---
