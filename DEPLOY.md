@@ -1,67 +1,98 @@
 # 部署指南
 
-本项目是 2 个容器:`app`(Node/BFF + 前端)+ `ncm-api`。核心任务:把它跑在**特斯拉能访问到的地方**,并**以 https 暴露**(车机浏览器需要 https;音频地址也已在前端升级为 https)。
+这套程序是两个容器:`app`(网页 + 后端)和 `ncm-api`(网易云接口)。要让特斯拉用上,需要把它跑在某台机器上,并给一个**公网 https 地址**让车机浏览器打开。
+
+下面按设备分三种,挑一种就行。
+
+- [Mac / 电脑,先试试](#mac)
+- [群晖 NAS(常年在线,推荐)](#nas)
+- [VPS / 云服务器](#vps)
+
+先决条件都一样:装 Docker,准备好手机(扫码登录用一次)。
 
 ---
 
-## 一、本地/服务器上把服务起起来
+<a id="mac"></a>
 
-任意装了 Docker 的机器(你的 Mac、家里常开的小主机、或一台便宜 VPS):
+## A. Mac / 电脑,先试试
 
+适合先在车上体验一下。用车时电脑要开着、脚本窗口要留着。
+
+1. 安装并打开 [Docker Desktop](https://www.docker.com/products/docker-desktop/)。
+2. 下载项目并运行脚本:
+   ```bash
+   git clone https://github.com/JovanCai/TeslaNetEaseMusic.git
+   cd TeslaNetEaseMusic
+   ./deploy.sh
+   ```
+3. 按提示用手机网易云 App 扫码登录。脚本最后会打印一行
+   `https://xxxx.trycloudflare.com`。
+4. 把这行地址在**特斯拉车机浏览器**里打开。
+
+这个临时地址每次运行会变。想要固定地址,看下面的群晖或 VPS 方案。
+
+---
+
+<a id="nas"></a>
+
+## B. 群晖 NAS(常年在线,推荐)
+
+群晖一直开机,适合天天用。**没有公网 IP 也可以** —— Cloudflare 隧道由群晖主动向外连接,Cloudflare 给你一个公网 https 地址,不用开端口映射。
+
+需要一个挂在 Cloudflare 上的域名(免费套餐即可;新域名约 ¥100/年)。
+
+### 1) 在群晖上装 Docker
+DSM 套件中心安装 **Container Manager**(旧版叫 Docker)。
+
+### 2) 把代码放到群晖
+用 SSH 登录群晖后:
 ```bash
-# 1) 拿到代码(二选一)
-git clone <你的仓库地址> tesla-music && cd tesla-music
-#   或把本地目录 rsync 到服务器(排除无用大目录):
-#   rsync -av --exclude node_modules --exclude .git ./tesla-music/ user@server:~/tesla-music/
-
-# 2) 配置
+git clone https://github.com/JovanCai/TeslaNetEaseMusic.git
+cd TeslaNetEaseMusic
 cp .env.example .env
-#   可留空直接用 App 内扫码登录;若想开区域解锁,在 .env 填 VITE_REAL_IP=<国内IP>(默认关)
-
-# 3) 构建并启动(前端在镜像内构建,无需本机 Node)
-set -a; . ./.env; set +a
-docker compose up -d --build
-
-# 4) 登录:浏览器打开 http://<该机IP>/ ,首次显示二维码 → 手机网易云 App 扫码
-#    cookie 存进 Docker 数据卷 cookie-data,重启不丢、长期免登录
+# 群晖的 80 端口常被 DSM 占用,建议在 .env 设一个别的:
+#   APP_PORT=8920
 ```
 
-到这一步,局域网内已能用。下面是让**特斯拉(公网)**也能访问且走 https。
+### 3) 在 Cloudflare 建一个隧道,拿到 token
+1. 登录 [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → **Networks → Tunnels → Create a tunnel** → 选 **Cloudflared**。
+2. 给隧道起个名,创建后它会显示一个 **token**(一长串)。复制它。
+3. 在 **Public Hostname** 里添加一条:
+   - Subdomain 填 `music`(随意),Domain 选你的域名 → 得到 `music.你的域名.com`
+   - Service 选 **HTTP**,地址填 `app:80`
+
+把 token 填进 `.env`:
+```bash
+CLOUDFLARE_TUNNEL_TOKEN=粘贴你的token
+```
+
+### 4) 启动(带隧道)
+```bash
+docker compose --profile tunnel up -d --build
+```
+
+### 5) 登录一次
+浏览器打开 `https://music.你的域名.com`(或群晖局域网地址 `http://群晖IP:8920`),用手机扫码登录。cookie 存进数据卷,以后免登录、群晖重启也不丢。
+
+之后特斯拉固定访问 `https://music.你的域名.com` 就行。
+
+> 用 Container Manager 图形界面也可以:把项目建成一个“项目(Project)”,选中 `docker-compose.yml`,并在环境变量里填好 `.env` 的内容。命令行更省事。
 
 ---
 
-## 二、以 https 暴露给车机(选一种)
+<a id="vps"></a>
 
-### 方案 A:Cloudflare 快速隧道 —— 最快,立刻能在车上试(临时地址)
+## C. VPS / 云服务器
 
-无需域名、无需开端口、无需证书。在跑着服务的机器上:
+有公网 IP 的服务器。日本无墙,网易云接口直连即可,选 Tokyo 机房延迟低(さくら / ConoHa / Vultr,约 ¥700/月)。
 
-```bash
-brew install cloudflared            # macOS;Linux 见 cloudflare 文档
-cloudflared tunnel --url http://localhost:80
-```
+两种给 https 的方式:
 
-它会打印一个 `https://xxxx.trycloudflare.com` 地址——直接在**特斯拉浏览器**打开即可。
-缺点:地址每次重启会变、仅适合验证(尤其适合先做 8b 真车验证)。
+**方式一:也用 Cloudflare 隧道**(和群晖一样,不依赖服务器开 443)
+按上面群晖的第 3、4 步做即可。
 
-### 方案 B:Cloudflare 命名隧道 —— 稳定地址,长期用(推荐)
-
-有一个托管在 Cloudflare 的域名即可(免费套餐够用):
-
-```bash
-cloudflared tunnel login
-cloudflared tunnel create tesla-music
-# 把子域名指向隧道,并在 config 里 service: http://localhost:80
-cloudflared tunnel route dns tesla-music music.你的域名.com
-cloudflared tunnel run tesla-music
-```
-
-之后车机固定访问 `https://music.你的域名.com`。可用 systemd 让隧道与 docker 一起开机自启。
-
-### 方案 C:VPS + Caddy 自动 https —— 不想依赖 Cloudflare
-
-在有公网 IP 的 VPS 上,加一个 Caddy 反代(自动签发 Let's Encrypt 证书)。给 `docker-compose.yml` 增补:
-
+**方式二:域名 + Caddy 自动证书**（服务器有公网 IP 时更直接）
+把域名 A 记录指向服务器 IP,然后在 `docker-compose.yml` 里加一个 Caddy 反代:
 ```yaml
   caddy:
     image: caddy:2
@@ -71,23 +102,20 @@ cloudflared tunnel run tesla-music
     restart: unless-stopped
     volumes: [caddy-data:/data]
 ```
-
-(并把 `app` 的 `ports: ["80:80"]` 去掉,只让 Caddy 对外。`volumes:` 增加 `caddy-data:`。)域名 A 记录指向 VPS IP 即可。
-
----
-
-## 三、放哪台机器?
-
-- **只是先验证(8b 真车)**:你的 Mac + 方案 A,几分钟就能在车上打开。前提是测试时 Mac 开着。
-- **长期天天用**:一台便宜的**日本 VPS**(さくら/ConoHa/Vultr Tokyo,约 ¥700/月)始终在线最省心 + 方案 B 或 C 固定地址。家用常开小主机 + 方案 B 也可,但机器必须一直开着。
-
-日本无 GFW,网易云官方 API 公网可达,无需额外代理。
+并在 `volumes:` 下加 `caddy-data:`,把 `app` 的 `ports` 去掉(只让 Caddy 对外)。启动:
+```bash
+git clone https://github.com/JovanCai/TeslaNetEaseMusic.git && cd TeslaNetEaseMusic
+cp .env.example .env
+docker compose up -d --build
+```
+打开 `https://music.你的域名.com` 扫码登录即可。
 
 ---
 
 ## 常见问题
 
-- **改了 VITE_REAL_IP 不生效**:VITE_* 是构建时嵌入的,改后要 `docker compose up -d --build` 重新构建。
-- **想换账号 / cookie 过期**:清空登录态后重新扫码——`docker compose exec app rm -f /data/cookie && docker compose restart app`,再开页面扫码。
-- **车机打不开 http 地址**:务必用 https(方案 A/B/C 任一);车机对纯 http 与混合内容较敏感。
-- **升级版本**:`git pull && docker compose up -d --build`(cookie 在数据卷里,不受影响)。
+- **改了 `VITE_REAL_IP` 没生效**:它在构建时嵌入,改后要 `docker compose up -d --build` 重新构建。
+- **换账号 / cookie 过期**:`docker compose exec app rm -f /data/cookie && docker compose restart app`,再打开页面扫码。(Mac 上直接 `./relogin.sh`。)
+- **车机打不开地址**:确认用的是 https 地址(隧道或 Caddy 给的),车机对纯 http 比较敏感。
+- **升级版本**:`git pull && docker compose up -d --build`,cookie 在数据卷里不受影响。
+- **端口冲突**:在 `.env` 设 `APP_PORT` 换一个空闲端口。
