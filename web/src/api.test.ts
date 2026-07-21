@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { getSongUrl, getLyric, getDailySongs, search, getUserPlaylists } from './api'
+import { getSongUrl, getLyric, getDailySongs, getPersonalFm, search, getUserPlaylists } from './api'
 
 function mockFetch(json: unknown) {
   return vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(json) })
@@ -46,6 +46,13 @@ describe('getDailySongs', () => {
     vi.stubGlobal('fetch', mockFetch({ data: { dailySongs: [
       { id: 7, name: 'S', ar: [{ name: 'A' }], al: { picUrl: 'p' } }] } }))
     expect(await getDailySongs()).toEqual([{ id: 7, name: 'S', artist: 'A', cover: 'p' }])
+  })
+})
+describe('getPersonalFm', () => {
+  it('归一化 data(artists/album 形态)', async () => {
+    vi.stubGlobal('fetch', mockFetch({ data: [
+      { id: 3, name: 'FM', artists: [{ name: 'C' }], album: { picUrl: 'z' } }] }))
+    expect((await getPersonalFm())[0]).toEqual({ id: 3, name: 'FM', artist: 'C', cover: 'z' })
   })
 })
 describe('search', () => {

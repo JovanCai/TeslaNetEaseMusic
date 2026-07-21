@@ -37,6 +37,11 @@ export async function getDailySongs(): Promise<Song[]> {
   return (j?.data?.dailySongs ?? []).map(toSong)
 }
 
+export async function getPersonalFm(): Promise<Song[]> {
+  const j = await getJson('/personal_fm')
+  return (j?.data ?? []).map(toSong)
+}
+
 export async function getPlaylistTracks(id: number): Promise<Song[]> {
   const j = await getJson(`/playlist/track/all?id=${id}&limit=200`)
   return (j?.songs ?? []).map(toSong)

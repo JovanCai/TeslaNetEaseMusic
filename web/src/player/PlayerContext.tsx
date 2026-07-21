@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useReducer, useRef, type ReactNode } from 'react'
 import { nextIndex, prevIndex, buildShuffleOrder, type Repeat } from './queue'
-import { getSongUrl, getLyric, type Song } from '../api'
+import { getSongUrl, getLyric, getPersonalFm, type Song } from '../api'
 import { useAudio } from './useAudio'
 import { requestWakeLock } from './wakeLock'
 
@@ -14,13 +14,15 @@ export interface PlayerState {
   repeat: Repeat
   lrc: string
   pureMusic: boolean
+  radar: boolean    // 私人FM 模式:接近队尾时自动续接下一批
   playToken: number // 递增以强制(重新)加载当前曲(支持单曲循环重放)
 }
 export const initialPlayerState: PlayerState = {
-  queue: [], order: [], pos: -1, isPlaying: false, shuffle: false, repeat: 'off', lrc: '', pureMusic: false, playToken: 0,
+  queue: [], order: [], pos: -1, isPlaying: false, shuffle: false, repeat: 'off', lrc: '', pureMusic: false, radar: false, playToken: 0,
 }
 type Action =
   | { type: 'playList'; songs: Song[]; start: number }
+  | { type: 'startRadar'; songs: Song[] } | { type: 'appendSongs'; songs: Song[] }
   | { type: 'toggle' } | { type: 'next' } | { type: 'prev' } | { type: 'stop' }
   | { type: 'setShuffle'; on: boolean } | { type: 'cycleRepeat' }
   | { type: 'setLrc'; lrc: string; pureMusic: boolean }
@@ -33,7 +35,14 @@ export function playerReducer(s: PlayerState, a: Action): PlayerState {
     case 'playList': {
       const order = s.shuffle ? buildShuffleOrder(a.songs.length, a.start) : identity(a.songs.length)
       const pos = s.shuffle ? 0 : a.start
-      return { ...s, queue: a.songs, order, pos, isPlaying: true, lrc: '', pureMusic: false, playToken: s.playToken + 1 }
+      return { ...s, queue: a.songs, order, pos, isPlaying: true, radar: false, lrc: '', pureMusic: false, playToken: s.playToken + 1 }
+    }
+    case 'startRadar':
+      return { ...s, queue: a.songs, order: identity(a.songs.length), pos: 0, isPlaying: true, shuffle: false, radar: true, lrc: '', pureMusic: false, playToken: s.playToken + 1 }
+    case 'appendSongs': {
+      const start = s.queue.length
+      const appended = a.songs.map((_, i) => start + i)
+      return { ...s, queue: [...s.queue, ...a.songs], order: [...s.order, ...appended] }
     }
     case 'toggle': return { ...s, isPlaying: !s.isPlaying }
     case 'stop': return { ...s, isPlaying: false }
@@ -64,6 +73,7 @@ export function playerReducer(s: PlayerState, a: Action): PlayerState {
 interface PlayerValue extends PlayerState {
   current: Song | null; currentMs: number; durationMs: number; volume: number
   playList: (songs: Song[], start: number) => void
+  startRadar: () => void
   toggle: () => void; next: () => void; prev: () => void; seek: (ms: number) => void
   setVolume: (v: number) => void
   setShuffle: (on: boolean) => void; cycleRepeat: () => void
@@ -112,9 +122,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     state.isPlaying ? resume() : pause()
   }, [state.isPlaying]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 私人FM:接近队尾时预取下一批,形成无限流
+  const fetchingRef = useRef(false)
+  useEffect(() => {
+    if (!state.radar || state.pos < 0) return
+    if (state.pos < state.order.length - 2 || fetchingRef.current) return
+    fetchingRef.current = true
+    getPersonalFm()
+      .then((songs) => { if (songs.length) dispatch({ type: 'appendSongs', songs }) })
+      .catch(() => {})
+      .finally(() => { fetchingRef.current = false })
+  }, [state.radar, state.pos, state.order.length])
+
   const value: PlayerValue = {
     ...state, current, currentMs, durationMs, volume,
     playList: (songs, start) => dispatch({ type: 'playList', songs, start }),
+    startRadar: () => { getPersonalFm().then((songs) => { if (songs.length) dispatch({ type: 'startRadar', songs }) }).catch(() => {}) },
     toggle: () => dispatch({ type: 'toggle' }),
     next: () => dispatch({ type: 'next' }),
     prev: () => dispatch({ type: 'prev' }),

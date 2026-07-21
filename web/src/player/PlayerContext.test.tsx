@@ -68,4 +68,27 @@ describe('playerReducer', () => {
     expect(s.order).toEqual([0, 1, 2])
     expect(s.order[s.pos]).toBe(2)                    // 当前仍是 queue 下标 2
   })
+
+  it('startRadar:进入雷达模式并从头播', () => {
+    const s = playerReducer(initialPlayerState, { type: 'startRadar', songs })
+    expect(s.radar).toBe(true)
+    expect(s.pos).toBe(0)
+    expect(s.isPlaying).toBe(true)
+    expect(s.order).toEqual([0, 1, 2])
+  })
+
+  it('appendSongs:队列与顺序续接、当前位置不变', () => {
+    let s = playerReducer(initialPlayerState, { type: 'startRadar', songs })
+    const more = [{ id: 9, name: 'd', artist: 'w', cover: '' }]
+    s = playerReducer(s, { type: 'appendSongs', songs: more })
+    expect(s.queue).toHaveLength(4)
+    expect(s.order).toEqual([0, 1, 2, 3])
+    expect(s.pos).toBe(0)
+  })
+
+  it('playList 会退出雷达模式', () => {
+    let s = playerReducer(initialPlayerState, { type: 'startRadar', songs })
+    s = playerReducer(s, { type: 'playList', songs, start: 0 })
+    expect(s.radar).toBe(false)
+  })
 })
