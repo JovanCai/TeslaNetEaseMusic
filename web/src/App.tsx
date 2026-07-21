@@ -1,15 +1,24 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { TabBar } from './components/TabBar'
 import { Daily } from './views/Daily'
 import { Playlists } from './views/Playlists'
 import { Search } from './views/Search'
+import { Login } from './views/Login'
 import { MiniPlayer } from './player/MiniPlayer'
 import { NowPlaying } from './player/NowPlaying'
+import { sessionApi } from './session'
 import './App.css'
 
 export default function App() {
   const [tab, setTab] = useState('daily')
   const [showNP, setShowNP] = useState(false)
+  const [authed, setAuthed] = useState<boolean | null>(null)
+
+  useEffect(() => { sessionApi.status().then((s) => setAuthed(s.loggedIn)).catch(() => setAuthed(false)) }, [])
+
+  if (authed === null) return <div className="shell" />
+  if (!authed) return <Login onDone={() => setAuthed(true)} />
+
   return (
     <div className="shell">
       <main className="content">
