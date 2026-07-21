@@ -1,0 +1,16 @@
+services:
+  ncm-api:
+    image: moefurina/ncm-api:latest
+    environment:
+      - ENABLE_GENERAL_UNBLOCK=false
+    restart: unless-stopped
+  web:
+    image: nginx:alpine
+    depends_on: [ncm-api]
+    ports: ["80:80"]
+    environment:
+      - NCM_MUSIC_U=${NCM_MUSIC_U}
+    volumes:
+      - ./web/dist:/usr/share/nginx/html:ro
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    restart: unless-stopped

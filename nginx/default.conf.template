@@ -1,0 +1,10 @@
+server {
+  listen 80;
+  root /usr/share/nginx/html;
+  index index.html;
+  location /api/ {
+    proxy_set_header Cookie "MUSIC_U=${NCM_MUSIC_U}";
+    proxy_pass http://ncm-api:3000/;
+  }
+  location / { try_files $uri /index.html; }
+}
