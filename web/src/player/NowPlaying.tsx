@@ -18,7 +18,6 @@ export function NowPlaying({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="np">
-      <button className="tap iconbtn np-close" onClick={onClose} aria-label="收起"><Icon name="chevronDown" /></button>
       {p.current.cover && <img className="np-cover" src={p.current.cover} alt="" />}
       <div className="np-title">{p.current.name}</div>
       <div className="np-artist">{p.current.artist}</div>
@@ -51,6 +50,10 @@ export function NowPlaying({ onClose }: { onClose: () => void }) {
         <input className="np-vol-seek" type="range" min={0} max={1} step={0.01}
           value={p.volume} onChange={(e) => p.setVolume(Number(e.target.value))} aria-label="音量" />
       </div>
+
+      <button className="tap np-collapse" onClick={onClose} aria-label="收起">
+        <Icon name="chevronDown" size={22} /> 收起
+      </button>
     </div>
   )
 }
