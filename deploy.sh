@@ -65,13 +65,23 @@ if ! command -v cloudflared >/dev/null 2>&1; then
   fi
 fi
 
-# 7) 生成并打印车机可访问地址
-cat <<'BANNER'
-
-────────────────────────────────────────────────────────
-  下面会出现一行  https://xxxx.trycloudflare.com  地址。
-  ➜ 在【特斯拉车机浏览器】里打开那个地址,就能用了。
-  ➜ 本窗口保持开着(关掉地址就失效);电脑也要保持开机。
-────────────────────────────────────────────────────────
-BANNER
-exec cloudflared tunnel --url http://localhost:80
+# 7) 生成车机可访问地址(等隧道真正就绪后再打印,避免车上打开时还没通)
+say "正在生成车机可访问的 https 地址(约 10 秒)……"
+LOG=$(mktemp)
+cloudflared tunnel --url http://localhost:80 > "$LOG" 2>&1 &
+CFPID=$!
+trap 'kill $CFPID 2>/dev/null' EXIT
+URL=""
+for _ in $(seq 1 40); do
+  [ -z "$URL" ] && URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$LOG" | head -1)
+  if [ -n "$URL" ] && grep -qiE 'Registered tunnel connection' "$LOG"; then break; fi
+  sleep 2
+done
+if [ -z "$URL" ]; then warn "隧道启动失败,请重跑本脚本。"; exit 1; fi
+sleep 3
+printf "\n\033[1;32m════════════════════════════════════════════════\033[0m\n"
+printf "  ✅ 在【特斯拉车机浏览器】打开这个地址:\n\n"
+printf "      \033[1;36m%s\033[0m\n\n" "$URL"
+printf "  (本窗口保持开着、电脑保持开机;按 Ctrl+C 结束)\n"
+printf "\033[1;32m════════════════════════════════════════════════\033[0m\n\n"
+wait $CFPID
