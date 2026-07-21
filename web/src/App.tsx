@@ -23,14 +23,16 @@ export default function App() {
   return (
     <div className="shell">
       <main className="content">
-        {tab === 'daily' && <Daily />}
-        {tab === 'playlists' && <Playlists />}
-        {tab === 'search' && <Search />}
+        <div key={tab} className="view-anim">
+          {tab === 'daily' && <Daily />}
+          {tab === 'playlists' && <Playlists />}
+          {tab === 'search' && <Search />}
+        </div>
       </main>
       <FastScroll />
       <MiniPlayer onExpand={() => setShowNP(true)} />
       <TabBar tab={tab} onTab={setTab} />
-      {showNP && <NowPlaying onClose={() => setShowNP(false)} />}
+      <NowPlaying open={showNP} onClose={() => setShowNP(false)} />
     </div>
   )
 }

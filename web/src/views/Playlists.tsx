@@ -21,7 +21,7 @@ export function Playlists() {
 
   if (detail) {
     return (
-      <div className="view">
+      <div key="detail" className="view sub-anim">
         <button className="tap back-btn" onClick={() => setDetail(null)}>← 返回歌单</button>
         <div className="detail-head">
           <h2 className="view-title neon-text">{detail.name}</h2>
@@ -40,7 +40,7 @@ export function Playlists() {
     )
   }
   return (
-    <div className="view">
+    <div key="grid" className="view sub-anim">
       <h2 className="view-title neon-text">我的歌单</h2>
       <div className="pl-grid">
         {lists.map((pl) => (

@@ -10,24 +10,24 @@ function fmt(ms: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
-export function NowPlaying({ onClose }: { onClose: () => void }) {
+export function NowPlaying({ open, onClose }: { open: boolean; onClose: () => void }) {
   const p = usePlayer()
   const lines = useMemo(() => parseLrc(p.lrc), [p.lrc])
   const active = getCurrentLineIndex(lines, p.currentMs)
   if (!p.current) return null
 
   return (
-    <div className="np">
+    <div className={`np ${open ? 'open' : ''}`} aria-hidden={!open}>
       {p.current.cover && <img className="np-cover" src={p.current.cover} alt="" />}
       <div className="np-title">{p.current.name}</div>
       <div className="np-artist">{p.current.artist}</div>
 
       <div className="np-lyrics">
-        {p.pureMusic
+        {open && (p.pureMusic
           ? <div className="np-nolyric">纯音乐 · 请欣赏</div>
           : lines.length === 0
             ? <div className="np-nolyric">暂无歌词</div>
-            : <LyricsView lines={lines} activeIndex={active} />}
+            : <LyricsView lines={lines} activeIndex={active} />)}
       </div>
 
       <div className="np-progress">

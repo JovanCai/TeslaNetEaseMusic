@@ -24,6 +24,16 @@ button { font-family: inherit; }
   box-shadow:0 8px 30px rgba(0,0,0,.4);
 }
 .neon-text { color:var(--cyan); text-shadow:0 0 12px rgba(34,211,238,.6); }
+
+/* 页面/视图切换过渡 */
+.view-anim { animation: viewIn .34s cubic-bezier(.2,.8,.2,1); }
+@keyframes viewIn { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform:none; } }
+.sub-anim { animation: subIn .3s cubic-bezier(.2,.8,.2,1); }
+@keyframes subIn { from { opacity:0; transform: translateX(24px); } to { opacity:1; transform:none; } }
+@media (prefers-reduced-motion: reduce) {
+  .view-anim, .sub-anim { animation: none; }
+  .np { transition: none; }
+}
 .tap {
   min-height:64px;
   display:flex; align-items:center; justify-content:center;
