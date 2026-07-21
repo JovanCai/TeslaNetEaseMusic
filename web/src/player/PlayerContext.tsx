@@ -36,7 +36,7 @@ export function playerReducer(s: PlayerState, a: Action): PlayerState {
 }
 
 interface PlayerValue extends PlayerState {
-  current: Song | null; currentMs: number
+  current: Song | null; currentMs: number; durationMs: number
   playList: (songs: Song[], start: number) => void
   toggle: () => void; next: () => void; prev: () => void; seek: (ms: number) => void
   setShuffle: (on: boolean) => void; cycleRepeat: () => void
@@ -46,7 +46,7 @@ const Ctx = createContext<PlayerValue | null>(null)
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(playerReducer, initialPlayerState)
   const handleEnded = useCallback(() => dispatch({ type: 'next' }), [])
-  const { play, pause, resume, seek, currentMs } = useAudio(handleEnded)
+  const { play, pause, resume, seek, currentMs, durationMs } = useAudio(handleEnded)
   const current = state.index >= 0 ? state.queue[state.index] : null
 
   useEffect(() => {
@@ -70,7 +70,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [state.isPlaying]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const value: PlayerValue = {
-    ...state, current, currentMs,
+    ...state, current, currentMs, durationMs,
     playList: (songs, start) => dispatch({ type: 'playList', songs, start }),
     toggle: () => dispatch({ type: 'toggle' }),
     next: () => dispatch({ type: 'next' }),

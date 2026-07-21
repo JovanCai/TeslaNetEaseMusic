@@ -1,0 +1,18 @@
+.mini { position:fixed; left:12px; right:12px; bottom:88px; display:flex; align-items:center; gap:8px; padding:8px 12px; z-index:20; }
+.mini-info { flex:1; gap:12px; justify-content:flex-start; }
+.mini-cover { width:48px; height:48px; border-radius:10px; }
+.mini-name { font-weight:600; }
+.mini-artist { color:var(--text-2); font-size:.9rem; }
+.ctl { min-width:64px; height:64px; font-size:1.6rem; background:none; border:0; color:var(--text); }
+.ctl.big { font-size:2.4rem; color:var(--cyan); text-shadow:0 0 16px rgba(34,211,238,.6); }
+.ctl.on { color:var(--cyan); text-shadow:0 0 12px rgba(34,211,238,.6); }
+
+.np { position:fixed; inset:0; z-index:30; display:flex; flex-direction:column; align-items:center;
+  background:linear-gradient(180deg, var(--bg), var(--bg-2)); }
+.np-close { align-self:center; font-size:2rem; color:var(--text-2); background:none; border:0; height:56px; }
+.np-title { font-size:1.4rem; margin:4px 0 8px; text-align:center; padding:0 16px; }
+.np-lyrics { flex:1; overflow:hidden; width:100%; }
+.np-progress { display:flex; align-items:center; gap:12px; width:min(720px,90%); padding:8px 0; }
+.np-time { color:var(--text-2); font-variant-numeric:tabular-nums; font-size:.9rem; min-width:44px; text-align:center; }
+.np-seek { flex:1; height:6px; accent-color:var(--cyan); }
+.np-ctl { display:flex; gap:8px; padding:12px 0 40px; }
