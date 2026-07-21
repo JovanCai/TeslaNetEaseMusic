@@ -45,6 +45,12 @@ export function NowPlaying({ onClose }: { onClose: () => void }) {
         <button className="tap iconbtn" onClick={p.next} aria-label="下一首"><Icon name="next" size={30} /></button>
         <button className={`tap iconbtn ${p.repeat !== 'off' ? 'on' : ''}`} onClick={p.cycleRepeat} aria-label="循环"><Icon name={p.repeat === 'one' ? 'repeatOne' : 'repeat'} size={22} /></button>
       </div>
+
+      <div className="np-volume">
+        <Icon name="volume" size={20} />
+        <input className="np-vol-seek" type="range" min={0} max={1} step={0.01}
+          value={p.volume} onChange={(e) => p.setVolume(Number(e.target.value))} aria-label="音量" />
+      </div>
     </div>
   )
 }

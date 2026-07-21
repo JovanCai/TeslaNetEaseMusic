@@ -1,4 +1,4 @@
-type Name = 'play' | 'pause' | 'prev' | 'next' | 'shuffle' | 'repeat' | 'repeatOne' | 'chevronDown' | 'search'
+type Name = 'play' | 'pause' | 'prev' | 'next' | 'shuffle' | 'repeat' | 'repeatOne' | 'chevronDown' | 'search' | 'volume'
 
 const PATHS: Record<Name, React.ReactNode> = {
   play: <path d="M8 5v14l11-7z" fill="currentColor" stroke="none" />,
@@ -10,6 +10,7 @@ const PATHS: Record<Name, React.ReactNode> = {
   repeatOne: <><path d="M17 2l4 4-4 4" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><path d="M7 22l-4-4 4-4" /><path d="M21 13v2a4 4 0 0 1-4 4H3" /><path d="M11 10h1v4" /></>,
   chevronDown: <path d="M6 9l6 6 6-6" />,
   search: <><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></>,
+  volume: <><path d="M4 9v6h4l5 4V5L8 9z" /><path d="M16.5 8.5a5 5 0 0 1 0 7" /></>,
 }
 
 export function Icon({ name, size = 26 }: { name: Name; size?: number }) {

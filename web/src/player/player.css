@@ -44,7 +44,9 @@
 .np-progress { display:flex; align-items:center; gap:12px; width:min(760px,94%); padding:6px 0; }
 .np-time { color:var(--text-2); font-variant-numeric:tabular-nums; font-size:.85rem; min-width:42px; text-align:center; }
 .np-seek { flex:1; height:6px; accent-color:var(--cyan); }
-.np-ctl { display:flex; align-items:center; gap:10px; padding:14px 0 8px; }
+.np-ctl { display:flex; align-items:center; gap:10px; padding:14px 0 6px; }
 .np-ctl .play-btn { width:84px; height:84px; border-radius:50%; color:var(--bg);
   background:linear-gradient(135deg,var(--cyan),var(--purple)); box-shadow:0 0 34px rgba(34,211,238,.45); }
 .np-ctl .play-btn:active { transform:scale(.9); }
+.np-volume { display:flex; align-items:center; gap:12px; width:min(320px,72%); color:var(--text-2); padding:2px 0 6px; }
+.np-vol-seek { flex:1; height:5px; accent-color:var(--purple); }

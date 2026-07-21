@@ -4,6 +4,7 @@ export function useAudio(onEnded?: () => void) {
   const [audio] = useState(() => new Audio())
   const [currentMs, setCurrentMs] = useState(0)
   const [durationMs, setDurationMs] = useState(0)
+  const [volume, setVolumeState] = useState(1)
 
   useEffect(() => {
     const onTime = () => setCurrentMs(audio.currentTime * 1000)
@@ -26,5 +27,6 @@ export function useAudio(onEnded?: () => void) {
   function pause() { audio.pause() }
   function resume() { audio.play().catch(() => {}) }
   function seek(ms: number) { audio.currentTime = ms / 1000 }
-  return { play, pause, resume, seek, currentMs, durationMs }
+  function setVolume(v: number) { audio.volume = v; setVolumeState(v) }
+  return { play, pause, resume, seek, setVolume, currentMs, durationMs, volume }
 }
