@@ -45,7 +45,7 @@ export function Playlists() {
       <div className="pl-grid">
         {lists.map((pl) => (
           <div key={pl.id} className="pl-card glass tap" onClick={() => open(pl)}>
-            {pl.cover && <img src={pl.cover} className="pl-cover" alt="" />}
+            {pl.cover && <img src={pl.cover} className="pl-cover" alt="" loading="lazy" />}
             <div className="pl-name">{pl.name}</div>
             <div className="pl-count">{pl.count} 首</div>
           </div>

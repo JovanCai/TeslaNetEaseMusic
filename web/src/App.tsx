@@ -6,6 +6,7 @@ import { Search } from './views/Search'
 import { Login } from './views/Login'
 import { MiniPlayer } from './player/MiniPlayer'
 import { NowPlaying } from './player/NowPlaying'
+import { FastScroll } from './components/FastScroll'
 import { sessionApi } from './session'
 import './App.css'
 
@@ -26,6 +27,7 @@ export default function App() {
         {tab === 'playlists' && <Playlists />}
         {tab === 'search' && <Search />}
       </main>
+      <FastScroll />
       <MiniPlayer onExpand={() => setShowNP(true)} />
       <TabBar tab={tab} onTab={setTab} />
       {showNP && <NowPlaying onClose={() => setShowNP(false)} />}
