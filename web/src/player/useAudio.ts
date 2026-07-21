@@ -1,21 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export function useAudio() {
-  const ref = useRef<HTMLAudioElement | null>(null)
+  const [audio] = useState(() => new Audio())
   const [currentMs, setCurrentMs] = useState(0)
-  if (!ref.current) ref.current = new Audio()
 
   useEffect(() => {
-    const a = ref.current!
-    const onTime = () => setCurrentMs(a.currentTime * 1000)
-    a.addEventListener('timeupdate', onTime)
-    return () => a.removeEventListener('timeupdate', onTime)
-  }, [])
+    const onTime = () => setCurrentMs(audio.currentTime * 1000)
+    audio.addEventListener('timeupdate', onTime)
+    return () => audio.removeEventListener('timeupdate', onTime)
+  }, [audio])
 
   async function play(url: string) {
-    const a = ref.current!
-    a.src = url
-    await a.play()
+    audio.src = url
+    await audio.play()
   }
   return { play, currentMs }
 }

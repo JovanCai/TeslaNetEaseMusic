@@ -11,24 +11,34 @@ const REAL_IP = import.meta.env.VITE_REAL_IP || undefined
 
 export default function App() {
   const { play, currentMs } = useAudio()
+  const [started, setStarted] = useState(false)
   const [lrc, setLrc] = useState('')
   const [err, setErr] = useState('')
   const lines = useMemo(() => parseLrc(lrc), [lrc])
   const active = getCurrentLineIndex(lines, currentMs)
 
   async function start() {
+    setErr('')
+    setStarted(true)
     try {
       await requestWakeLock()
       const [song, lyric] = await Promise.all([getSongUrl(SONG_ID, REAL_IP), getLyric(SONG_ID)])
-      if (!song.url) { setErr('无法获取播放地址(可能需要解锁)'); return }
+      if (!song.url) {
+        setErr('无法获取播放地址(账号无版权、音质等级不可用,或需开启区域解锁)')
+        setStarted(false)
+        return
+      }
       setLrc(lyric.lrc)
       await play(song.url)
-    } catch (e) { setErr(String(e)) }
+    } catch (e) {
+      setErr(String(e))
+      setStarted(false)
+    }
   }
 
   return (
     <main className="app">
-      {!lrc && <button className="start" onClick={start}>开始播放</button>}
+      {!started && <button className="start" onClick={start}>开始播放</button>}
       {err && <p className="err">{err}</p>}
       <LyricsView lines={lines} activeIndex={active} />
     </main>

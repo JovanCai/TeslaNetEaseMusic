@@ -6,7 +6,9 @@ export async function getSongUrl(id: number, realIP?: string): Promise<{ id: num
   const r = await fetch(`${BASE}/song/url/v1?${p}`)
   if (!r.ok) throw new Error(`song/url ${r.status}`)
   const j: any = await r.json()
-  return { id, url: j?.data?.[0]?.url ?? null }
+  const raw: string | null = j?.data?.[0]?.url ?? null
+  // 网易云常返回 http:// 地址;车机走 https 时 http 音频会被当混合内容拦掉,统一升级为 https。
+  return { id, url: raw ? raw.replace(/^http:\/\//, 'https://') : null }
 }
 
 export async function getLyric(id: number): Promise<{ lrc: string; tlyric: string }> {
