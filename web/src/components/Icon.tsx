@@ -1,4 +1,4 @@
-type Name = 'play' | 'pause' | 'prev' | 'next' | 'shuffle' | 'repeat' | 'repeatOne' | 'chevronDown' | 'search' | 'volume' | 'radar' | 'palette' | 'heart' | 'heartFilled' | 'album' | 'queue' | 'plus' | 'artist'
+type Name = 'play' | 'pause' | 'prev' | 'next' | 'shuffle' | 'repeat' | 'repeatOne' | 'chevronDown' | 'search' | 'volume' | 'radar' | 'palette' | 'heart' | 'heartFilled' | 'album' | 'queue' | 'plus' | 'artist' | 'layout'
 
 const PATHS: Record<Name, React.ReactNode> = {
   play: <path d="M8 5v14l11-7z" fill="currentColor" stroke="none" />,
@@ -19,6 +19,7 @@ const PATHS: Record<Name, React.ReactNode> = {
   queue: <><path d="M4 6h16" /><path d="M4 12h16" /><path d="M4 18h10" /><path d="M18 18l4-2.5-4-2.5z" fill="currentColor" stroke="none" /></>,
   plus: <><path d="M12 5v14" /><path d="M5 12h14" /></>,
   artist: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
+  layout: <><rect x="3" y="4" width="7" height="16" rx="1.5" /><rect x="13" y="4" width="8" height="16" rx="1.5" /></>,
 }
 
 export function Icon({ name, size = 26 }: { name: Name; size?: number }) {
