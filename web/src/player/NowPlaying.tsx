@@ -14,7 +14,13 @@ function fmt(ms: number) {
 export function NowPlaying({ open, onClose, onOpenAlbum }: { open: boolean; onClose: () => void; onOpenAlbum: (albumId: number) => void }) {
   const p = usePlayer()
   const [showQueue, setShowQueue] = useState(false)
-  const lines = useMemo(() => parseLrc(p.lrc), [p.lrc])
+  const lines = useMemo(() => {
+    const main = parseLrc(p.lrc)
+    const trans = parseLrc(p.tlyric)
+    if (!trans.length) return main
+    const map = new Map(trans.map((t) => [t.timeMs, t.text]))
+    return main.map((l) => ({ ...l, trans: map.get(l.timeMs) }))
+  }, [p.lrc, p.tlyric])
   const active = getCurrentLineIndex(lines, p.currentMs)
 
   // 打开时锁住背后页面滚动,避免歌词区以外滑动穿透到底层(歌单等)
@@ -53,7 +59,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum }: { open: boolean; onCl
           ? <div className="np-nolyric">纯音乐 · 请欣赏</div>
           : lines.length === 0
             ? <div className="np-nolyric">暂无歌词</div>
-            : <LyricsView lines={lines} activeIndex={active} />)}
+            : <LyricsView lines={lines} activeIndex={active} onSeek={(ms) => p.seek(ms)} />)}
       </div>
 
       <div className="np-progress">

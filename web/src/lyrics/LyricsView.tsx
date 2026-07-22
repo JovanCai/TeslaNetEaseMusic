@@ -1,7 +1,13 @@
 import { useEffect, useRef } from 'react'
 import type { LyricLine } from './parseLrc'
 
-export function LyricsView({ lines, activeIndex }: { lines: LyricLine[]; activeIndex: number }) {
+export interface LyricLineEx extends LyricLine { trans?: string }
+
+export function LyricsView({ lines, activeIndex, onSeek }: {
+  lines: LyricLineEx[]
+  activeIndex: number
+  onSeek?: (ms: number) => void
+}) {
   const activeRef = useRef<HTMLParagraphElement | null>(null)
   useEffect(() => {
     activeRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
@@ -18,8 +24,10 @@ export function LyricsView({ lines, activeIndex }: { lines: LyricLine[]; activeI
             ref={active ? activeRef : null}
             data-active={active}
             className={active ? 'line active' : 'line'}
+            onClick={() => onSeek?.(l.timeMs)}
           >
             {l.text}
+            {l.trans && <span className="line-trans">{l.trans}</span>}
           </p>
         )
       })}
