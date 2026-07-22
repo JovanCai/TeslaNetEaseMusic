@@ -3,6 +3,7 @@ import { usePlayer } from './PlayerContext'
 import { parseLrc, getCurrentLineIndex } from '../lyrics/parseLrc'
 import { LyricsView } from '../lyrics/LyricsView'
 import { QueueView } from './QueueView'
+import { QualityPicker } from '../components/QualityPicker'
 import { Icon } from '../components/Icon'
 import './player.css'
 
@@ -82,6 +83,8 @@ export function NowPlaying({ open, onClose, onOpenAlbum }: { open: boolean; onCl
         <input className="np-vol-seek" type="range" min={0} max={1} step={0.01}
           value={p.volume} onChange={(e) => p.setVolume(Number(e.target.value))} aria-label="音量" />
       </div>
+
+      <QualityPicker />
 
       <button className="tap np-collapse" onClick={onClose} aria-label="收起">
         <Icon name="chevronDown" size={22} /> 收起

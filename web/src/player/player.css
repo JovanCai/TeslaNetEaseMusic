@@ -64,6 +64,14 @@
 .np-volume { display:flex; align-items:center; gap:12px; width:min(320px,72%); color:var(--text-2); padding:2px 0 6px; }
 .np-vol-seek { flex:1; height:5px; accent-color:var(--accent-2); }
 
+/* ---- 音质选择 ---- */
+.quality { position:relative; margin-top:2px; }
+.quality-btn { background:none; border:0; color:var(--text-2); font-size:.9rem; padding:6px 14px; }
+.quality-mask { position:fixed; inset:0; z-index:31; }
+.quality-pop { position:absolute; bottom:100%; left:50%; transform:translateX(-50%); margin-bottom:8px; z-index:32; padding:6px; min-width:130px; }
+.quality-row { min-height:46px; justify-content:center; border-radius:8px; color:var(--text); }
+.quality-row.on { color:var(--accent); }
+
 /* ---- 播放队列面板 ---- */
 .queue-mask { position:fixed; inset:0; z-index:34; background:rgba(0,0,0,.4); }
 .queue-sheet { position:fixed; left:0; right:0; bottom:0; height:76vh; z-index:35; border-radius:20px 20px 0 0;

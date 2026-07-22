@@ -5,6 +5,7 @@ import { useAudio } from './useAudio'
 import { requestWakeLock } from './wakeLock'
 import { loadPersisted, savePersisted } from './persist'
 import { toast } from '../ui/toast'
+import { loadQuality, saveQuality } from '../ui/quality'
 
 export type { Song }
 export interface PlayerState {
@@ -31,6 +32,7 @@ type Action =
   | { type: 'setLrc'; lrc: string; tlyric: string; pureMusic: boolean }
   | { type: 'jumpTo'; pos: number } | { type: 'removeAt'; pos: number }
   | { type: 'enqueueNext'; song: Song } | { type: 'enqueue'; song: Song }
+  | { type: 'reload' }
 
 const identity = (n: number) => Array.from({ length: n }, (_, i) => i)
 const curQueueIndex = (s: PlayerState) => (s.pos >= 0 ? s.order[s.pos] : -1)
@@ -71,6 +73,7 @@ export function playerReducer(s: PlayerState, a: Action): PlayerState {
       return { ...s, repeat: order[(order.indexOf(s.repeat) + 1) % 3] }
     }
     case 'setLrc': return { ...s, lrc: a.lrc, tlyric: a.tlyric, pureMusic: a.pureMusic }
+    case 'reload': return { ...s, playToken: s.playToken + 1, lrc: '', tlyric: '', pureMusic: false }
     case 'jumpTo':
       if (a.pos < 0 || a.pos >= s.order.length) return s
       return { ...s, pos: a.pos, isPlaying: true, lrc: '', tlyric: '', pureMusic: false, playToken: s.playToken + 1 }
@@ -113,6 +116,7 @@ interface PlayerValue extends PlayerState {
   isLiked: (id: number) => boolean; toggleLike: (id: number) => void
   jumpTo: (pos: number) => void; removeAt: (pos: number) => void
   enqueueNext: (song: Song) => void; enqueue: (song: Song) => void
+  quality: string; setQuality: (id: string) => void
 }
 const Ctx = createContext<PlayerValue | null>(null)
 
@@ -145,7 +149,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
     ;(async () => {
       try {
-        const [song, lyric] = await Promise.all([getSongUrl(current.id), getLyric(current.id)])
+        const [song, lyric] = await Promise.all([getSongUrl(current.id, loadQuality()), getLyric(current.id)])
         if (cancelled) return
         dispatch({ type: 'setLrc', lrc: lyric.lrc, tlyric: lyric.tlyric, pureMusic: lyric.pureMusic })
         if (song.url) {
@@ -214,6 +218,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, [currentMs, durationMs])
 
+  // 音质:持久化选择,切换后重载当前曲以新音质取地址
+  const [quality, setQualityState] = useState(loadQuality())
+  const setQuality = (id: string) => { setQualityState(id); saveQuality(id); dispatch({ type: 'reload' }) }
+
   // 红心(“我喜欢的音乐”):加载红心列表,提供 isLiked / toggleLike(乐观更新+失败回滚)
   const [likedIds, setLikedIds] = useState<Set<number>>(new Set())
   useEffect(() => {
@@ -234,7 +242,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const queueSongs = state.order.map((i) => state.queue[i])
 
   const value: PlayerValue = {
-    ...state, current, currentMs, durationMs, volume, queueSongs,
+    ...state, current, currentMs, durationMs, volume, queueSongs, quality, setQuality,
     isLiked, toggleLike,
     jumpTo: (pos) => dispatch({ type: 'jumpTo', pos }),
     removeAt: (pos) => dispatch({ type: 'removeAt', pos }),
