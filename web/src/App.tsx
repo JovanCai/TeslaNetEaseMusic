@@ -9,7 +9,9 @@ import { MiniPlayer } from './player/MiniPlayer'
 import { NowPlaying } from './player/NowPlaying'
 import { FastScroll } from './components/FastScroll'
 import { ThemePicker } from './components/ThemePicker'
+import { Toaster } from './components/Toaster'
 import { sessionApi } from './session'
+import { getLoginStatus } from './api'
 import './App.css'
 
 export default function App() {
@@ -18,7 +20,21 @@ export default function App() {
   const [albumId, setAlbumId] = useState<number | null>(null)
   const [authed, setAuthed] = useState<boolean | null>(null)
 
-  useEffect(() => { sessionApi.status().then((s) => setAuthed(s.loggedIn)).catch(() => setAuthed(false)) }, [])
+  useEffect(() => {
+    let stop = false
+    async function check() {
+      try {
+        const s = await getLoginStatus() // 真实登录态(命中网易云),能发现 cookie 过期
+        if (!stop) setAuthed(s.loggedIn)
+      } catch {
+        try { const s = await sessionApi.status(); if (!stop) setAuthed(s.loggedIn) } // 暂时不可达:退回 cookie 判断,避免误判登出
+        catch { if (!stop) setAuthed(false) }
+      }
+    }
+    check()
+    const t = window.setInterval(check, 5 * 60 * 1000) // 定期复查,处理中途过期
+    return () => { stop = true; window.clearInterval(t) }
+  }, [])
 
   function goTab(t: string) { setAlbumId(null); setTab(t) } // 切换标签时离开专辑页
 
@@ -39,6 +55,7 @@ export default function App() {
           )}
       </main>
       <ThemePicker />
+      <Toaster />
       <FastScroll />
       <MiniPlayer onExpand={() => setShowNP(true)} />
       <TabBar tab={tab} onTab={goTab} />

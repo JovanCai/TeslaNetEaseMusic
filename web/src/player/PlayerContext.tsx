@@ -4,6 +4,7 @@ import { getSongUrl, getLyric, getPersonalFm, getLikedIds, setLike, getLoginStat
 import { useAudio } from './useAudio'
 import { requestWakeLock } from './wakeLock'
 import { loadPersisted, savePersisted } from './persist'
+import { toast } from '../ui/toast'
 
 export type { Song }
 export interface PlayerState {
@@ -106,8 +107,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     const advanceAfterUnplayable = () => {
       skipRef.current += 1
-      if (skipRef.current < state.queue.length) dispatch({ type: 'next' })
-      else { skipRef.current = 0; dispatch({ type: 'stop' }) }
+      if (skipRef.current < state.queue.length) { toast('这首暂时播不了,已跳过'); dispatch({ type: 'next' }) }
+      else { skipRef.current = 0; toast('队列里的歌暂时都放不了'); dispatch({ type: 'stop' }) }
     }
     ;(async () => {
       try {
