@@ -145,6 +145,40 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       .finally(() => { fetchingRef.current = false })
   }, [state.radar, state.pos, state.order.length])
 
+  // Media Session:让车机/系统的“正在播放”显示专辑封面+歌名,并响应媒体键
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return
+    const ms = navigator.mediaSession
+    if (!current) { ms.metadata = null; document.title = 'TeslaNetEaseMusic'; return }
+    const cover = current.cover
+    ms.metadata = new MediaMetadata({
+      title: current.name,
+      artist: current.artist,
+      artwork: cover
+        ? [128, 256, 512].map((s) => ({ src: `${cover}?param=${s}y${s}`, sizes: `${s}x${s}`, type: 'image/jpeg' }))
+        : [],
+    })
+    document.title = `${current.name} - ${current.artist}`
+    ms.setActionHandler('play', () => { if (!isPlayingRef.current) dispatch({ type: 'toggle' }) })
+    ms.setActionHandler('pause', () => { if (isPlayingRef.current) dispatch({ type: 'toggle' }) })
+    ms.setActionHandler('previoustrack', () => dispatch({ type: 'prev' }))
+    ms.setActionHandler('nexttrack', () => dispatch({ type: 'next' }))
+    try { ms.setActionHandler('seekto', (d) => { if (d.seekTime != null) seek(d.seekTime * 1000) }) } catch { /* 不支持则忽略 */ }
+  }, [current?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = state.isPlaying ? 'playing' : 'paused'
+  }, [state.isPlaying])
+
+  useEffect(() => {
+    if (!('mediaSession' in navigator) || typeof navigator.mediaSession.setPositionState !== 'function') return
+    if (durationMs > 0) {
+      try {
+        navigator.mediaSession.setPositionState({ duration: durationMs / 1000, position: Math.min(currentMs, durationMs) / 1000 })
+      } catch { /* 忽略 */ }
+    }
+  }, [currentMs, durationMs])
+
   const value: PlayerValue = {
     ...state, current, currentMs, durationMs, volume,
     playList: (songs, start) => dispatch({ type: 'playList', songs, start }),
