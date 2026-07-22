@@ -28,6 +28,8 @@ type Action =
   | { type: 'toggle' } | { type: 'next' } | { type: 'prev' } | { type: 'stop' }
   | { type: 'setShuffle'; on: boolean } | { type: 'cycleRepeat' }
   | { type: 'setLrc'; lrc: string; pureMusic: boolean }
+  | { type: 'jumpTo'; pos: number } | { type: 'removeAt'; pos: number }
+  | { type: 'enqueueNext'; song: Song } | { type: 'enqueue'; song: Song }
 
 const identity = (n: number) => Array.from({ length: n }, (_, i) => i)
 const curQueueIndex = (s: PlayerState) => (s.pos >= 0 ? s.order[s.pos] : -1)
@@ -68,18 +70,48 @@ export function playerReducer(s: PlayerState, a: Action): PlayerState {
       return { ...s, repeat: order[(order.indexOf(s.repeat) + 1) % 3] }
     }
     case 'setLrc': return { ...s, lrc: a.lrc, pureMusic: a.pureMusic }
+    case 'jumpTo':
+      if (a.pos < 0 || a.pos >= s.order.length) return s
+      return { ...s, pos: a.pos, isPlaying: true, lrc: '', pureMusic: false, playToken: s.playToken + 1 }
+    case 'removeAt': {
+      if (a.pos < 0 || a.pos >= s.order.length) return s
+      const order = s.order.slice(0, a.pos).concat(s.order.slice(a.pos + 1))
+      if (order.length === 0) return { ...initialPlayerState, queue: s.queue, playToken: s.playToken + 1 }
+      if (a.pos < s.pos) return { ...s, order, pos: s.pos - 1 }
+      if (a.pos === s.pos) { // 移除的是当前曲:同位置变为下一首,重载播放
+        const pos = Math.min(s.pos, order.length - 1)
+        return { ...s, order, pos, lrc: '', pureMusic: false, isPlaying: true, playToken: s.playToken + 1 }
+      }
+      return { ...s, order } // 移除的在当前之后,不影响播放
+    }
+    case 'enqueueNext': {
+      const idx = s.queue.length
+      const queue = [...s.queue, a.song]
+      if (s.pos < 0) return { ...s, queue, order: [idx], pos: 0, isPlaying: true, radar: false, lrc: '', pureMusic: false, playToken: s.playToken + 1 }
+      const order = s.order.slice(0, s.pos + 1).concat([idx], s.order.slice(s.pos + 1))
+      return { ...s, queue, order }
+    }
+    case 'enqueue': {
+      const idx = s.queue.length
+      const queue = [...s.queue, a.song]
+      if (s.pos < 0) return { ...s, queue, order: [idx], pos: 0, isPlaying: true, radar: false, lrc: '', pureMusic: false, playToken: s.playToken + 1 }
+      return { ...s, queue, order: [...s.order, idx] }
+    }
     default: return s
   }
 }
 
 interface PlayerValue extends PlayerState {
   current: Song | null; currentMs: number; durationMs: number; volume: number
+  queueSongs: Song[]
   playList: (songs: Song[], start: number) => void
   startRadar: () => void
   toggle: () => void; next: () => void; prev: () => void; seek: (ms: number) => void
   setVolume: (v: number) => void
   setShuffle: (on: boolean) => void; cycleRepeat: () => void
   isLiked: (id: number) => boolean; toggleLike: (id: number) => void
+  jumpTo: (pos: number) => void; removeAt: (pos: number) => void
+  enqueueNext: (song: Song) => void; enqueue: (song: Song) => void
 }
 const Ctx = createContext<PlayerValue | null>(null)
 
@@ -198,9 +230,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     })
   }
 
+  const queueSongs = state.order.map((i) => state.queue[i])
+
   const value: PlayerValue = {
-    ...state, current, currentMs, durationMs, volume,
+    ...state, current, currentMs, durationMs, volume, queueSongs,
     isLiked, toggleLike,
+    jumpTo: (pos) => dispatch({ type: 'jumpTo', pos }),
+    removeAt: (pos) => dispatch({ type: 'removeAt', pos }),
+    enqueueNext: (song) => { dispatch({ type: 'enqueueNext', song }); toast('已设为下一首') },
+    enqueue: (song) => { dispatch({ type: 'enqueue', song }); toast('已加入队列') },
     playList: (songs, start) => dispatch({ type: 'playList', songs, start }),
     startRadar: () => { getPersonalFm().then((songs) => { if (songs.length) dispatch({ type: 'startRadar', songs }) }).catch(() => {}) },
     toggle: () => dispatch({ type: 'toggle' }),

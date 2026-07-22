@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Song } from '../api'
 import { usePlayer } from '../player/PlayerContext'
+import { Icon } from './Icon'
 
 const ROW = 72       // 每行固定高度(px)
 const OVERSCAN = 6   // 视口上下多渲染几行,滚动更顺
@@ -37,6 +38,9 @@ export function SongList({ songs }: { songs: Song[] }) {
           <div className="song-name">{s.name}</div>
           <div className="song-artist">{s.artist}</div>
         </div>
+        <button className="tap song-add" onClick={(e) => { e.stopPropagation(); p.enqueueNext(s) }} aria-label="下一首播放">
+          <Icon name="plus" size={20} />
+        </button>
       </div>,
     )
   }

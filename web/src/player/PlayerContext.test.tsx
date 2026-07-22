@@ -91,4 +91,43 @@ describe('playerReducer', () => {
     s = playerReducer(s, { type: 'playList', songs, start: 0 })
     expect(s.radar).toBe(false)
   })
+
+  const d = { id: 9, name: 'd', artist: 'w', cover: '', albumId: 0 }
+
+  it('enqueue 空队列直接开始播放', () => {
+    const s = playerReducer(initialPlayerState, { type: 'enqueue', song: d })
+    expect(s.queue).toHaveLength(1)
+    expect(s.pos).toBe(0)
+    expect(s.isPlaying).toBe(true)
+  })
+  it('enqueueNext 插入当前之后', () => {
+    let s = play(0) // order [0,1,2], pos 0
+    s = playerReducer(s, { type: 'enqueueNext', song: d })
+    expect(s.queue).toHaveLength(4)
+    expect(s.order[1]).toBe(3) // 新歌 queue 下标 3 插到 pos0 之后
+  })
+  it('enqueue 加到队尾', () => {
+    let s = play(0)
+    s = playerReducer(s, { type: 'enqueue', song: d })
+    expect(s.order[s.order.length - 1]).toBe(3)
+  })
+  it('jumpTo 跳到指定位置并播放', () => {
+    let s = play(0)
+    s = playerReducer(s, { type: 'jumpTo', pos: 2 })
+    expect(s.pos).toBe(2)
+    expect(s.isPlaying).toBe(true)
+  })
+  it('removeAt 移除当前之前的曲,pos 前移', () => {
+    let s = play(2) // pos 2
+    s = playerReducer(s, { type: 'removeAt', pos: 0 })
+    expect(s.order).toEqual([1, 2])
+    expect(s.order[s.pos]).toBe(2) // 当前仍是原来那首
+  })
+  it('removeAt 移除当前曲,同位置变为下一首', () => {
+    let s = play(0) // order [0,1,2], pos 0
+    s = playerReducer(s, { type: 'removeAt', pos: 0 })
+    expect(s.order).toEqual([1, 2])
+    expect(s.pos).toBe(0)
+    expect(s.order[s.pos]).toBe(1)
+  })
 })

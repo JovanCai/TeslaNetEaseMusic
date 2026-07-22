@@ -1,7 +1,8 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { usePlayer } from './PlayerContext'
 import { parseLrc, getCurrentLineIndex } from '../lyrics/parseLrc'
 import { LyricsView } from '../lyrics/LyricsView'
+import { QueueView } from './QueueView'
 import { Icon } from '../components/Icon'
 import './player.css'
 
@@ -12,6 +13,7 @@ function fmt(ms: number) {
 
 export function NowPlaying({ open, onClose, onOpenAlbum }: { open: boolean; onClose: () => void; onOpenAlbum: (albumId: number) => void }) {
   const p = usePlayer()
+  const [showQueue, setShowQueue] = useState(false)
   const lines = useMemo(() => parseLrc(p.lrc), [p.lrc])
   const active = getCurrentLineIndex(lines, p.currentMs)
 
@@ -41,6 +43,9 @@ export function NowPlaying({ open, onClose, onOpenAlbum }: { open: boolean; onCl
             <Icon name="album" size={22} />
           </button>
         )}
+        <button className="tap iconbtn" onClick={() => setShowQueue(true)} aria-label="播放队列">
+          <Icon name="queue" size={22} />
+        </button>
       </div>
 
       <div className="np-lyrics">
@@ -75,6 +80,8 @@ export function NowPlaying({ open, onClose, onOpenAlbum }: { open: boolean; onCl
       <button className="tap np-collapse" onClick={onClose} aria-label="收起">
         <Icon name="chevronDown" size={22} /> 收起
       </button>
+
+      {showQueue && <QueueView onClose={() => setShowQueue(false)} />}
     </div>
   )
 }

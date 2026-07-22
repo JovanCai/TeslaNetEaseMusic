@@ -53,7 +53,9 @@
 .song-row { justify-content:flex-start; gap:12px; padding:10px 8px; border-radius:12px; }
 .song-row:active { background:var(--surface); }
 .song-cover { width:52px; height:52px; border-radius:10px; flex-shrink:0; }
-.song-meta { min-width:0; }
+.song-meta { flex:1; min-width:0; }
+.song-add { min-width:44px; height:44px; background:none; border:0; color:var(--text-2); flex-shrink:0; }
+.song-add:active { transform:scale(.85); color:var(--accent); }
 .song-name { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .song-artist { color:var(--text-2); font-size:.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
