@@ -6,6 +6,7 @@ import { Search } from './views/Search'
 import { Login } from './views/Login'
 import { AlbumView } from './views/AlbumView'
 import { ArtistView } from './views/ArtistView'
+import { PlaylistView } from './views/PlaylistView'
 import { MiniPlayer } from './player/MiniPlayer'
 import { NowPlaying } from './player/NowPlaying'
 import { FastScroll } from './components/FastScroll'
@@ -20,7 +21,13 @@ export default function App() {
   const [showNP, setShowNP] = useState(false)
   const [albumId, setAlbumId] = useState<number | null>(null)
   const [artistId, setArtistId] = useState<number | null>(null)
+  const [playlist, setPlaylist] = useState<{ id: number; name: string } | null>(null)
   const [authed, setAuthed] = useState<boolean | null>(null)
+
+  // 详情页互斥:打开一个就清掉其它
+  const openAlbum = (id: number) => { setArtistId(null); setPlaylist(null); setAlbumId(id) }
+  const openArtist = (id: number) => { setAlbumId(null); setPlaylist(null); setArtistId(id) }
+  const openPlaylist = (id: number, name: string) => { setAlbumId(null); setArtistId(null); setPlaylist({ id, name }) }
 
   useEffect(() => {
     let stop = false
@@ -38,7 +45,7 @@ export default function App() {
     return () => { stop = true; window.clearInterval(t) }
   }, [])
 
-  function goTab(t: string) { setAlbumId(null); setArtistId(null); setTab(t) } // 切换标签时离开专辑/歌手页
+  function goTab(t: string) { setAlbumId(null); setArtistId(null); setPlaylist(null); setTab(t) } // 切换标签时离开详情页
 
   if (authed === null) return <div className="shell" />
   if (!authed) return <Login onDone={() => setAuthed(true)} />
@@ -50,13 +57,15 @@ export default function App() {
           ? <AlbumView key={`album-${albumId}`} albumId={albumId} onClose={() => setAlbumId(null)} />
           : artistId != null
             ? <ArtistView key={`artist-${artistId}`} artistId={artistId} onClose={() => setArtistId(null)} />
-            : (
-              <div key={tab} className="view-anim">
-                {tab === 'daily' && <Daily />}
-                {tab === 'playlists' && <Playlists />}
-                {tab === 'search' && <Search />}
-              </div>
-            )}
+            : playlist != null
+              ? <PlaylistView key={`pl-${playlist.id}`} id={playlist.id} name={playlist.name} onClose={() => setPlaylist(null)} />
+              : (
+                <div key={tab} className="view-anim">
+                  {tab === 'daily' && <Daily />}
+                  {tab === 'playlists' && <Playlists onOpenPlaylist={openPlaylist} />}
+                  {tab === 'search' && <Search onOpenAlbum={openAlbum} onOpenArtist={openArtist} onOpenPlaylist={openPlaylist} />}
+                </div>
+              )}
       </main>
       <ThemePicker />
       <Toaster />
@@ -64,8 +73,8 @@ export default function App() {
       <MiniPlayer onExpand={() => setShowNP(true)} />
       <TabBar tab={tab} onTab={goTab} />
       <NowPlaying open={showNP} onClose={() => setShowNP(false)}
-        onOpenAlbum={(id) => { setShowNP(false); setArtistId(null); setAlbumId(id) }}
-        onOpenArtist={(id) => { setShowNP(false); setAlbumId(null); setArtistId(id) }} />
+        onOpenAlbum={(id) => { setShowNP(false); openAlbum(id) }}
+        onOpenArtist={(id) => { setShowNP(false); openArtist(id) }} />
     </div>
   )
 }

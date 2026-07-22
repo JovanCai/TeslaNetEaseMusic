@@ -61,6 +61,21 @@ export async function search(keywords: string): Promise<Song[]> {
   return (j?.result?.songs ?? []).map(toSong)
 }
 
+export interface Card { id: number; name: string; cover: string; sub: string }
+
+export async function searchAlbums(keywords: string): Promise<Card[]> {
+  const j = await getJson(`/cloudsearch?keywords=${encodeURIComponent(keywords)}&type=10&limit=30`)
+  return (j?.result?.albums ?? []).map((a: any) => ({ id: a.id, name: a.name, cover: toHttps(a.picUrl ?? ''), sub: a.artist?.name ?? '' }))
+}
+export async function searchArtists(keywords: string): Promise<Card[]> {
+  const j = await getJson(`/cloudsearch?keywords=${encodeURIComponent(keywords)}&type=100&limit=30`)
+  return (j?.result?.artists ?? []).map((a: any) => ({ id: a.id, name: a.name, cover: toHttps(a.picUrl ?? a.img1v1Url ?? ''), sub: '歌手' }))
+}
+export async function searchPlaylists(keywords: string): Promise<Card[]> {
+  const j = await getJson(`/cloudsearch?keywords=${encodeURIComponent(keywords)}&type=1000&limit=30`)
+  return (j?.result?.playlists ?? []).map((p: any) => ({ id: p.id, name: p.name, cover: toHttps(p.coverImgUrl ?? ''), sub: `${p.trackCount ?? 0} 首` }))
+}
+
 export async function getUserPlaylists(uid: number): Promise<{ id: number; name: string; cover: string; count: number }[]> {
   const j = await getJson(`/user/playlist?uid=${uid}&limit=60`)
   return (j?.playlist ?? []).map((p: any) => ({ id: p.id, name: p.name, cover: toHttps(p.coverImgUrl ?? ''), count: p.trackCount ?? 0 }))

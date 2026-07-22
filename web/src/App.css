@@ -73,6 +73,17 @@
   background:linear-gradient(90deg,var(--accent),var(--accent-2)); color:var(--on-accent); }
 .search-go:active { transform:scale(.94); }
 
+.search-types { display:flex; gap:8px; margin-bottom:14px; }
+.stype { min-height:auto; padding:8px 18px; border-radius:16px; color:var(--text-2); background:var(--surface); font-size:.95rem; }
+.stype.on { color:var(--on-accent); background:linear-gradient(90deg,var(--accent),var(--accent-2)); font-weight:600; }
+.stype:active { transform:scale(.94); }
+.search-hist { margin-top:4px; }
+.hist-head { display:flex; justify-content:space-between; align-items:center; color:var(--text-2); margin-bottom:10px; }
+.hist-clear { min-height:auto; padding:0; background:none; border:0; color:var(--text-2); }
+.hist-chips { display:flex; flex-wrap:wrap; gap:10px; }
+.hist-chip { min-height:auto; padding:8px 16px; border-radius:18px; background:var(--surface); border:1px solid var(--border); color:var(--text); }
+.hist-chip:active { transform:scale(.94); }
+
 .tabbar { position:fixed; left:12px; right:12px; bottom:12px; display:flex; height:72px; z-index:20; padding:6px; gap:6px; }
 .tabbtn { flex:1; font-size:1.25rem; color:var(--text-2); border-radius:12px; font-weight:600; }
 .tabbtn:active { transform:scale(.95); }
