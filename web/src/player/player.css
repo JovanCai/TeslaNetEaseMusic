@@ -46,7 +46,7 @@
 .lyrics { text-align:center; padding:34vh 0; display:flex; flex-direction:column; gap:14px; }
 .line { font-size:1.4rem; line-height:1.5; color:var(--text-2); opacity:.55;
   transition: opacity .35s ease, color .35s ease, transform .35s ease, text-shadow .35s ease; transform:scale(.96); }
-.line.active { opacity:1; color:#fff; font-weight:700; transform:scale(1.06);
+.line.active { opacity:1; color:var(--text-strong); font-weight:700; transform:scale(1.06);
   text-shadow:0 0 18px rgba(var(--accent-rgb),.65); }
 .np-nolyric { display:flex; align-items:center; justify-content:center; height:100%;
   color:var(--text-2); font-size:1.3rem; letter-spacing:2px; }
@@ -56,7 +56,7 @@
 .np-time { color:var(--text-2); font-variant-numeric:tabular-nums; font-size:.85rem; min-width:42px; text-align:center; }
 .np-seek { flex:1; height:6px; accent-color:var(--accent); }
 .np-ctl { display:flex; align-items:center; gap:10px; padding:14px 0 6px; }
-.np-ctl .play-btn { width:84px; height:84px; border-radius:50%; color:var(--bg);
+.np-ctl .play-btn { width:84px; height:84px; border-radius:50%; color:var(--on-accent);
   background:linear-gradient(135deg,var(--accent),var(--accent-2)); box-shadow:0 0 34px rgba(var(--accent-rgb),.45); }
 .np-ctl .play-btn:active { transform:scale(.9); }
 .np-volume { display:flex; align-items:center; gap:12px; width:min(320px,72%); color:var(--text-2); padding:2px 0 6px; }

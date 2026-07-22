@@ -3,6 +3,7 @@ export const THEMES = [
   { id: 'crimson', name: '赤焰' },
   { id: 'aurora', name: '极光' },
   { id: 'sunset', name: '暮光' },
+  { id: 'daylight', name: '浅色' },
 ] as const
 
 const KEY = 'tm.theme'
