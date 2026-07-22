@@ -17,7 +17,7 @@ export async function getLyric(id: number): Promise<{ lrc: string; tlyric: strin
   return { lrc: j?.lrc?.lyric ?? '', tlyric: j?.tlyric?.lyric ?? '', pureMusic: !!j?.pureMusic }
 }
 
-export interface Song { id: number; name: string; artist: string; cover: string; albumId: number }
+export interface Song { id: number; name: string; artist: string; cover: string; albumId: number; artistId: number }
 
 // 网易云封面常返回 http://,车机走 https 时会被混合内容拦掉,统一升级为 https。
 const toHttps = (u: string) => u.replace(/^http:\/\//, 'https://')
@@ -25,7 +25,7 @@ const toHttps = (u: string) => u.replace(/^http:\/\//, 'https://')
 function toSong(r: any): Song {
   const ar = r.ar ?? r.artists ?? []
   const al = r.al ?? r.album ?? {}
-  return { id: r.id, name: r.name, artist: ar[0]?.name ?? '', cover: toHttps(al.picUrl ?? ''), albumId: al.id ?? 0 }
+  return { id: r.id, name: r.name, artist: ar[0]?.name ?? '', cover: toHttps(al.picUrl ?? ''), albumId: al.id ?? 0, artistId: ar[0]?.id ?? 0 }
 }
 
 async function getJson(path: string): Promise<any> {
@@ -91,5 +91,16 @@ export async function getAlbum(id: number): Promise<{ name: string; cover: strin
     name: j?.album?.name ?? '',
     cover: toHttps(j?.album?.picUrl ?? ''),
     songs: (j?.songs ?? []).map(toSong),
+  }
+}
+
+// 歌手详情:名称、封面、热门歌曲
+export async function getArtist(id: number): Promise<{ name: string; cover: string; songs: Song[] }> {
+  const j = await getJson(`/artists?id=${id}`)
+  const a = j?.artist ?? {}
+  return {
+    name: a.name ?? '',
+    cover: toHttps(a.picUrl ?? a.img1v1Url ?? ''),
+    songs: (j?.hotSongs ?? []).map(toSong),
   }
 }

@@ -12,7 +12,11 @@ function fmt(ms: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
-export function NowPlaying({ open, onClose, onOpenAlbum }: { open: boolean; onClose: () => void; onOpenAlbum: (albumId: number) => void }) {
+export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
+  open: boolean; onClose: () => void
+  onOpenAlbum: (albumId: number) => void
+  onOpenArtist: (artistId: number) => void
+}) {
   const p = usePlayer()
   const [showQueue, setShowQueue] = useState(false)
   const lines = useMemo(() => {
@@ -45,6 +49,11 @@ export function NowPlaying({ open, onClose, onOpenAlbum }: { open: boolean; onCl
           onClick={() => p.toggleLike(p.current!.id)} aria-label="红心">
           <Icon name={p.isLiked(p.current.id) ? 'heartFilled' : 'heart'} size={22} />
         </button>
+        {p.current.artistId > 0 && (
+          <button className="tap iconbtn" onClick={() => onOpenArtist(p.current!.artistId)} aria-label="歌手">
+            <Icon name="artist" size={22} />
+          </button>
+        )}
         {p.current.albumId > 0 && (
           <button className="tap iconbtn" onClick={() => onOpenAlbum(p.current!.albumId)} aria-label="所属专辑">
             <Icon name="album" size={22} />

@@ -39,21 +39,21 @@ describe('getDailySongs', () => {
   it('归一化 dailySongs', async () => {
     vi.stubGlobal('fetch', mockFetch({ data: { dailySongs: [
       { id: 7, name: 'S', ar: [{ name: 'A' }], al: { picUrl: 'p' } }] } }))
-    expect(await getDailySongs()).toEqual([{ id: 7, name: 'S', artist: 'A', cover: 'p', albumId: 0 }])
+    expect(await getDailySongs()).toEqual([{ id: 7, name: 'S', artist: 'A', cover: 'p', albumId: 0, artistId: 0 }])
   })
 })
 describe('getPersonalFm', () => {
   it('归一化 data(artists/album 形态)', async () => {
     vi.stubGlobal('fetch', mockFetch({ data: [
       { id: 3, name: 'FM', artists: [{ name: 'C' }], album: { picUrl: 'z' } }] }))
-    expect((await getPersonalFm())[0]).toEqual({ id: 3, name: 'FM', artist: 'C', cover: 'z', albumId: 0 })
+    expect((await getPersonalFm())[0]).toEqual({ id: 3, name: 'FM', artist: 'C', cover: 'z', albumId: 0, artistId: 0 })
   })
 })
 describe('search', () => {
   it('归一化 result.songs', async () => {
     vi.stubGlobal('fetch', mockFetch({ result: { songs: [
       { id: 9, name: 'T', ar: [{ name: 'B' }], al: { picUrl: 'q' } }] } }))
-    const r = await search('x'); expect(r[0]).toEqual({ id: 9, name: 'T', artist: 'B', cover: 'q', albumId: 0 })
+    const r = await search('x'); expect(r[0]).toEqual({ id: 9, name: 'T', artist: 'B', cover: 'q', albumId: 0, artistId: 0 })
   })
 })
 describe('getUserPlaylists', () => {
@@ -77,7 +77,7 @@ describe('getAlbum', () => {
     const a = await getAlbum(9)
     expect(a.name).toBe('AL')
     expect(a.cover).toBe('https://x/c.jpg')
-    expect(a.songs[0]).toEqual({ id: 5, name: 'S', artist: 'A', cover: 'https://x/p.jpg', albumId: 9 })
+    expect(a.songs[0]).toEqual({ id: 5, name: 'S', artist: 'A', cover: 'https://x/p.jpg', albumId: 9, artistId: 0 })
   })
 })
 

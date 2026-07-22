@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { loadPersisted, savePersisted } from './persist'
 
 const sample = {
-  queue: [{ id: 1, name: 'a', artist: 'x', cover: '', albumId: 0 }],
+  queue: [{ id: 1, name: 'a', artist: 'x', cover: '', albumId: 0, artistId: 0 }],
   order: [0], pos: 0, shuffle: false, repeat: 'all' as const, radar: true, volume: 0.4,
 }
 
