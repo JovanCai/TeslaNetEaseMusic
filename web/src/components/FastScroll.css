@@ -8,9 +8,9 @@
 }
 .fastscroll-thumb {
   position:absolute; width:10px; height:72px; left:50%; transform:translateX(-50%);
-  border-radius:8px; background:linear-gradient(180deg,var(--cyan),var(--purple));
-  box-shadow:0 0 12px rgba(34,211,238,.5); transition:width .12s ease, box-shadow .12s ease;
+  border-radius:8px; background:linear-gradient(180deg,var(--accent),var(--accent-2));
+  box-shadow:0 0 12px rgba(var(--accent-rgb),.5); transition:width .12s ease, box-shadow .12s ease;
 }
 .fastscroll.dragging .fastscroll-thumb {
-  width:16px; box-shadow:0 0 20px rgba(34,211,238,.8);
+  width:16px; box-shadow:0 0 20px rgba(var(--accent-rgb),.8);
 }

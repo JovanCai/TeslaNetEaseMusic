@@ -5,13 +5,13 @@
   transition: transform .14s cubic-bezier(.2,.8,.2,1), color .2s ease, background .2s ease, box-shadow .2s ease;
 }
 .iconbtn:active { transform: scale(.85); background:var(--surface); }
-.iconbtn.on { color:var(--cyan); filter: drop-shadow(0 0 8px rgba(34,211,238,.7)); }
+.iconbtn.on { color:var(--accent); filter: drop-shadow(0 0 8px rgba(var(--accent-rgb),.7)); }
 
 /* ---- 迷你播放条 ---- */
 .mini { position:fixed; left:12px; right:12px; bottom:96px; display:flex; align-items:center; gap:8px;
   padding:8px 10px; z-index:20; overflow:hidden; }
-.mini-bar { position:absolute; left:0; top:0; height:2px; background:linear-gradient(90deg,var(--cyan),var(--purple));
-  box-shadow:0 0 8px rgba(34,211,238,.7); transition:width .25s linear; }
+.mini-bar { position:absolute; left:0; top:0; height:2px; background:linear-gradient(90deg,var(--accent),var(--accent-2));
+  box-shadow:0 0 8px rgba(var(--accent-rgb),.7); transition:width .25s linear; }
 .mini-info { flex:1; gap:12px; justify-content:flex-start; min-width:0; }
 .mini-cover { width:48px; height:48px; border-radius:12px; flex-shrink:0; }
 .mini-meta { min-width:0; }
@@ -21,7 +21,7 @@
 /* ---- 全屏播放页 ---- */
 .np { position:fixed; inset:0; z-index:30; display:flex; flex-direction:column; align-items:center;
   padding:40px 16px 20px; background:
-    radial-gradient(900px 500px at 50% -5%, rgba(168,85,247,.14), transparent),
+    radial-gradient(900px 500px at 50% -5%, rgba(var(--accent2-rgb),.14), transparent),
     linear-gradient(180deg, var(--bg), var(--bg-2));
   transform: translateY(100%); transition: transform .4s cubic-bezier(.4,0,.2,1);
   will-change: transform; }
@@ -45,17 +45,17 @@
 .line { font-size:1.4rem; line-height:1.5; color:var(--text-2); opacity:.55;
   transition: opacity .35s ease, color .35s ease, transform .35s ease, text-shadow .35s ease; transform:scale(.96); }
 .line.active { opacity:1; color:#fff; font-weight:700; transform:scale(1.06);
-  text-shadow:0 0 18px rgba(34,211,238,.65); }
+  text-shadow:0 0 18px rgba(var(--accent-rgb),.65); }
 .np-nolyric { display:flex; align-items:center; justify-content:center; height:100%;
   color:var(--text-2); font-size:1.3rem; letter-spacing:2px; }
 
 /* ---- 进度条 + 控制 ---- */
 .np-progress { display:flex; align-items:center; gap:12px; width:min(760px,94%); padding:6px 0; }
 .np-time { color:var(--text-2); font-variant-numeric:tabular-nums; font-size:.85rem; min-width:42px; text-align:center; }
-.np-seek { flex:1; height:6px; accent-color:var(--cyan); }
+.np-seek { flex:1; height:6px; accent-color:var(--accent); }
 .np-ctl { display:flex; align-items:center; gap:10px; padding:14px 0 6px; }
 .np-ctl .play-btn { width:84px; height:84px; border-radius:50%; color:var(--bg);
-  background:linear-gradient(135deg,var(--cyan),var(--purple)); box-shadow:0 0 34px rgba(34,211,238,.45); }
+  background:linear-gradient(135deg,var(--accent),var(--accent-2)); box-shadow:0 0 34px rgba(var(--accent-rgb),.45); }
 .np-ctl .play-btn:active { transform:scale(.9); }
 .np-volume { display:flex; align-items:center; gap:12px; width:min(320px,72%); color:var(--text-2); padding:2px 0 6px; }
-.np-vol-seek { flex:1; height:5px; accent-color:var(--purple); }
+.np-vol-seek { flex:1; height:5px; accent-color:var(--accent-2); }

@@ -1,4 +1,4 @@
-type Name = 'play' | 'pause' | 'prev' | 'next' | 'shuffle' | 'repeat' | 'repeatOne' | 'chevronDown' | 'search' | 'volume' | 'radar'
+type Name = 'play' | 'pause' | 'prev' | 'next' | 'shuffle' | 'repeat' | 'repeatOne' | 'chevronDown' | 'search' | 'volume' | 'radar' | 'palette' | 'heart' | 'heartFilled' | 'album'
 
 const PATHS: Record<Name, React.ReactNode> = {
   play: <path d="M8 5v14l11-7z" fill="currentColor" stroke="none" />,
@@ -12,6 +12,10 @@ const PATHS: Record<Name, React.ReactNode> = {
   search: <><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></>,
   volume: <><path d="M4 9v6h4l5 4V5L8 9z" /><path d="M16.5 8.5a5 5 0 0 1 0 7" /></>,
   radar: <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4.5" /><path d="M12 12l7-4" /></>,
+  palette: <><circle cx="12" cy="12" r="9" /><circle cx="8.5" cy="9.5" r="1.2" fill="currentColor" stroke="none" /><circle cx="15.5" cy="9.5" r="1.2" fill="currentColor" stroke="none" /><circle cx="9" cy="15" r="1.2" fill="currentColor" stroke="none" /><path d="M12 21a3 3 0 0 1 0-6 2 2 0 0 0 0-4" /></>,
+  heart: <path d="M12 20s-7-4.35-9.5-8.5C1 8.5 2.5 5.5 5.5 5.5c2 0 3.2 1.2 4 2.3.8-1.1 2-2.3 4-2.3 3 0 4.5 3 3 6-2.5 4.15-8.5 8.5-8.5 8.5z" />,
+  heartFilled: <path d="M12 20s-7-4.35-9.5-8.5C1 8.5 2.5 5.5 5.5 5.5c2 0 3.2 1.2 4 2.3.8-1.1 2-2.3 4-2.3 3 0 4.5 3 3 6-2.5 4.15-8.5 8.5-8.5 8.5z" fill="currentColor" stroke="none" />,
+  album: <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="2.5" /></>,
 }
 
 export function Icon({ name, size = 26 }: { name: Name; size?: number }) {

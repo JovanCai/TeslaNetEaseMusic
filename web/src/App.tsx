@@ -7,6 +7,7 @@ import { Login } from './views/Login'
 import { MiniPlayer } from './player/MiniPlayer'
 import { NowPlaying } from './player/NowPlaying'
 import { FastScroll } from './components/FastScroll'
+import { ThemePicker } from './components/ThemePicker'
 import { sessionApi } from './session'
 import './App.css'
 
@@ -29,6 +30,7 @@ export default function App() {
           {tab === 'search' && <Search />}
         </div>
       </main>
+      <ThemePicker />
       <FastScroll />
       <MiniPlayer onExpand={() => setShowNP(true)} />
       <TabBar tab={tab} onTab={setTab} />
