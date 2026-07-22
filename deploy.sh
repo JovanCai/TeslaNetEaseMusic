@@ -25,10 +25,10 @@ set -a; . ./.env; set +a
 docker compose up -d --build >/dev/null
 ok "服务已启动"
 
-# 4) 等就绪
+# 4) 等就绪(等到 ncm-api 也起来、能出二维码,避免刚打开页面时后端还没好)
 printf "等待服务就绪"
-for _ in $(seq 1 30); do
-  if curl -sf http://localhost/session/status >/dev/null 2>&1; then break; fi
+for _ in $(seq 1 45); do
+  if curl -s -X POST http://localhost/session/qr/key 2>/dev/null | grep -q unikey; then break; fi
   printf "."; sleep 2
 done
 printf "\n"
