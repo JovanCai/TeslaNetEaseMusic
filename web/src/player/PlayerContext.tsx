@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
 import { nextIndex, prevIndex, buildShuffleOrder, type Repeat } from './queue'
-import { getSongUrl, getLyric, getPersonalFm, type Song } from '../api'
+import { getSongUrl, getLyric, getPersonalFm, getLikedIds, setLike, getLoginStatus, type Song } from '../api'
 import { useAudio } from './useAudio'
 import { requestWakeLock } from './wakeLock'
 import { loadPersisted, savePersisted } from './persist'
@@ -78,6 +78,7 @@ interface PlayerValue extends PlayerState {
   toggle: () => void; next: () => void; prev: () => void; seek: (ms: number) => void
   setVolume: (v: number) => void
   setShuffle: (on: boolean) => void; cycleRepeat: () => void
+  isLiked: (id: number) => boolean; toggleLike: (id: number) => void
 }
 const Ctx = createContext<PlayerValue | null>(null)
 
@@ -179,8 +180,26 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }
   }, [currentMs, durationMs])
 
+  // 红心(“我喜欢的音乐”):加载红心列表,提供 isLiked / toggleLike(乐观更新+失败回滚)
+  const [likedIds, setLikedIds] = useState<Set<number>>(new Set())
+  useEffect(() => {
+    getLoginStatus()
+      .then((s) => (s.uid ? getLikedIds(s.uid) : []))
+      .then((ids) => setLikedIds(new Set(ids)))
+      .catch(() => {})
+  }, [])
+  const isLiked = (id: number) => likedIds.has(id)
+  const toggleLike = (id: number) => {
+    const like = !likedIds.has(id)
+    setLikedIds((prev) => { const n = new Set(prev); if (like) n.add(id); else n.delete(id); return n })
+    setLike(id, like).catch(() => {
+      setLikedIds((prev) => { const n = new Set(prev); if (like) n.delete(id); else n.add(id); return n })
+    })
+  }
+
   const value: PlayerValue = {
     ...state, current, currentMs, durationMs, volume,
+    isLiked, toggleLike,
     playList: (songs, start) => dispatch({ type: 'playList', songs, start }),
     startRadar: () => { getPersonalFm().then((songs) => { if (songs.length) dispatch({ type: 'startRadar', songs }) }).catch(() => {}) },
     toggle: () => dispatch({ type: 'toggle' }),

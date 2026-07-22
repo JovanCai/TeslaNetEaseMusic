@@ -17,7 +17,7 @@ export async function getLyric(id: number): Promise<{ lrc: string; tlyric: strin
   return { lrc: j?.lrc?.lyric ?? '', tlyric: j?.tlyric?.lyric ?? '', pureMusic: !!j?.pureMusic }
 }
 
-export interface Song { id: number; name: string; artist: string; cover: string }
+export interface Song { id: number; name: string; artist: string; cover: string; albumId: number }
 
 // 网易云封面常返回 http://,车机走 https 时会被混合内容拦掉,统一升级为 https。
 const toHttps = (u: string) => u.replace(/^http:\/\//, 'https://')
@@ -25,7 +25,7 @@ const toHttps = (u: string) => u.replace(/^http:\/\//, 'https://')
 function toSong(r: any): Song {
   const ar = r.ar ?? r.artists ?? []
   const al = r.al ?? r.album ?? {}
-  return { id: r.id, name: r.name, artist: ar[0]?.name ?? '', cover: toHttps(al.picUrl ?? '') }
+  return { id: r.id, name: r.name, artist: ar[0]?.name ?? '', cover: toHttps(al.picUrl ?? ''), albumId: al.id ?? 0 }
 }
 
 async function getJson(path: string): Promise<any> {
@@ -70,4 +70,26 @@ export async function getLoginStatus(): Promise<{ loggedIn: boolean; uid: number
   const j = await getJson('/login/status')
   const prof = j?.data?.profile
   return { loggedIn: !!prof, uid: prof?.userId ?? null, nickname: prof?.nickname ?? null }
+}
+
+// 红心歌曲 ID 列表(“我喜欢的音乐”)
+export async function getLikedIds(uid: number): Promise<number[]> {
+  const j = await getJson(`/likelist?uid=${uid}`)
+  return j?.ids ?? []
+}
+
+// 红心/取消红心一首歌
+export async function setLike(id: number, like: boolean): Promise<boolean> {
+  const j = await getJson(`/like?id=${id}&like=${like}&timestamp=${Date.now()}`)
+  return j?.code === 200
+}
+
+// 专辑详情:名称、封面、曲目
+export async function getAlbum(id: number): Promise<{ name: string; cover: string; songs: Song[] }> {
+  const j = await getJson(`/album?id=${id}`)
+  return {
+    name: j?.album?.name ?? '',
+    cover: toHttps(j?.album?.picUrl ?? ''),
+    songs: (j?.songs ?? []).map(toSong),
+  }
 }

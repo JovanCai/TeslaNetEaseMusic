@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { playerReducer, initialPlayerState } from './PlayerContext'
 
 const songs = [
-  { id: 1, name: 'a', artist: 'x', cover: '' },
-  { id: 2, name: 'b', artist: 'y', cover: '' },
-  { id: 3, name: 'c', artist: 'z', cover: '' },
+  { id: 1, name: 'a', artist: 'x', cover: '', albumId: 0 },
+  { id: 2, name: 'b', artist: 'y', cover: '', albumId: 0 },
+  { id: 3, name: 'c', artist: 'z', cover: '', albumId: 0 },
 ]
 const play = (start: number, base = initialPlayerState) =>
   playerReducer(base, { type: 'playList', songs, start })
@@ -79,7 +79,7 @@ describe('playerReducer', () => {
 
   it('appendSongs:队列与顺序续接、当前位置不变', () => {
     let s = playerReducer(initialPlayerState, { type: 'startRadar', songs })
-    const more = [{ id: 9, name: 'd', artist: 'w', cover: '' }]
+    const more = [{ id: 9, name: 'd', artist: 'w', cover: '', albumId: 0 }]
     s = playerReducer(s, { type: 'appendSongs', songs: more })
     expect(s.queue).toHaveLength(4)
     expect(s.order).toEqual([0, 1, 2, 3])

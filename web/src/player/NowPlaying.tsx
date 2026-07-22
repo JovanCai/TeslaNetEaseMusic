@@ -10,7 +10,7 @@ function fmt(ms: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
-export function NowPlaying({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function NowPlaying({ open, onClose, onOpenAlbum }: { open: boolean; onClose: () => void; onOpenAlbum: (albumId: number) => void }) {
   const p = usePlayer()
   const lines = useMemo(() => parseLrc(p.lrc), [p.lrc])
   const active = getCurrentLineIndex(lines, p.currentMs)
@@ -30,6 +30,18 @@ export function NowPlaying({ open, onClose }: { open: boolean; onClose: () => vo
       {p.current.cover && <img className="np-cover" src={p.current.cover} alt="" />}
       <div className="np-title">{p.current.name}</div>
       <div className="np-artist">{p.current.artist}</div>
+
+      <div className="np-actions">
+        <button className={`tap iconbtn ${p.isLiked(p.current.id) ? 'liked' : ''}`}
+          onClick={() => p.toggleLike(p.current!.id)} aria-label="红心">
+          <Icon name={p.isLiked(p.current.id) ? 'heartFilled' : 'heart'} size={22} />
+        </button>
+        {p.current.albumId > 0 && (
+          <button className="tap iconbtn" onClick={() => onOpenAlbum(p.current!.albumId)} aria-label="所属专辑">
+            <Icon name="album" size={22} />
+          </button>
+        )}
+      </div>
 
       <div className="np-lyrics">
         {open && (p.pureMusic

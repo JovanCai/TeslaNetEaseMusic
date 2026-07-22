@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { getSongUrl, getLyric, getDailySongs, getPersonalFm, search, getUserPlaylists, getPlaylistTracks } from './api'
+import { getSongUrl, getLyric, getDailySongs, getPersonalFm, search, getUserPlaylists, getPlaylistTracks, getAlbum, getLikedIds } from './api'
 
 function mockFetch(json: unknown) {
   return vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(json) })
@@ -39,27 +39,45 @@ describe('getDailySongs', () => {
   it('归一化 dailySongs', async () => {
     vi.stubGlobal('fetch', mockFetch({ data: { dailySongs: [
       { id: 7, name: 'S', ar: [{ name: 'A' }], al: { picUrl: 'p' } }] } }))
-    expect(await getDailySongs()).toEqual([{ id: 7, name: 'S', artist: 'A', cover: 'p' }])
+    expect(await getDailySongs()).toEqual([{ id: 7, name: 'S', artist: 'A', cover: 'p', albumId: 0 }])
   })
 })
 describe('getPersonalFm', () => {
   it('归一化 data(artists/album 形态)', async () => {
     vi.stubGlobal('fetch', mockFetch({ data: [
       { id: 3, name: 'FM', artists: [{ name: 'C' }], album: { picUrl: 'z' } }] }))
-    expect((await getPersonalFm())[0]).toEqual({ id: 3, name: 'FM', artist: 'C', cover: 'z' })
+    expect((await getPersonalFm())[0]).toEqual({ id: 3, name: 'FM', artist: 'C', cover: 'z', albumId: 0 })
   })
 })
 describe('search', () => {
   it('归一化 result.songs', async () => {
     vi.stubGlobal('fetch', mockFetch({ result: { songs: [
       { id: 9, name: 'T', ar: [{ name: 'B' }], al: { picUrl: 'q' } }] } }))
-    const r = await search('x'); expect(r[0]).toEqual({ id: 9, name: 'T', artist: 'B', cover: 'q' })
+    const r = await search('x'); expect(r[0]).toEqual({ id: 9, name: 'T', artist: 'B', cover: 'q', albumId: 0 })
   })
 })
 describe('getUserPlaylists', () => {
   it('映射歌单概要', async () => {
     vi.stubGlobal('fetch', mockFetch({ playlist: [{ id: 1, name: 'PL', coverImgUrl: 'c', trackCount: 5 }] }))
     expect(await getUserPlaylists(42)).toEqual([{ id: 1, name: 'PL', cover: 'c', count: 5 }])
+  })
+})
+describe('getLikedIds', () => {
+  it('返回红心 id 列表', async () => {
+    vi.stubGlobal('fetch', mockFetch({ ids: [1, 2, 3] }))
+    expect(await getLikedIds(42)).toEqual([1, 2, 3])
+  })
+})
+describe('getAlbum', () => {
+  it('归一化专辑名/封面/曲目(含 albumId)', async () => {
+    vi.stubGlobal('fetch', mockFetch({
+      album: { name: 'AL', picUrl: 'http://x/c.jpg' },
+      songs: [{ id: 5, name: 'S', ar: [{ name: 'A' }], al: { id: 9, picUrl: 'http://x/p.jpg' } }],
+    }))
+    const a = await getAlbum(9)
+    expect(a.name).toBe('AL')
+    expect(a.cover).toBe('https://x/c.jpg')
+    expect(a.songs[0]).toEqual({ id: 5, name: 'S', artist: 'A', cover: 'https://x/p.jpg', albumId: 9 })
   })
 })
 
