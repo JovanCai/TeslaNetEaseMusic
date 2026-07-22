@@ -22,8 +22,8 @@ export function ThemePicker() {
           <div className="theme-mask" onClick={() => setOpen(false)} />
           <div className="theme-pop glass">
             {THEMES.map((t) => (
-              <div key={t.id} data-theme={t.id} className={`theme-row tap ${theme === t.id ? 'on' : ''}`} onClick={() => pick(t.id)}>
-                <span className="theme-swatch" />
+              <div key={t.id} className={`theme-row tap ${theme === t.id ? 'on' : ''}`} onClick={() => pick(t.id)}>
+                <span className="theme-swatch" data-theme={t.id} />
                 <span className="theme-name">{t.name}</span>
                 {theme === t.id && <span className="theme-check">✓</span>}
               </div>
