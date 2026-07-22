@@ -19,6 +19,14 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
 }) {
   const p = usePlayer()
   const [showQueue, setShowQueue] = useState(false)
+  const [showTrans, setShowTrans] = useState(() => {
+    try { return localStorage.getItem('tm.showtrans') !== '0' } catch { return true }
+  })
+  function toggleTrans() {
+    const v = !showTrans
+    setShowTrans(v)
+    try { localStorage.setItem('tm.showtrans', v ? '1' : '0') } catch { /* 忽略 */ }
+  }
   const lines = useMemo(() => {
     const main = parseLrc(p.lrc)
     const trans = parseLrc(p.tlyric)
@@ -27,6 +35,8 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
     return main.map((l) => ({ ...l, trans: map.get(l.timeMs) }))
   }, [p.lrc, p.tlyric])
   const active = getCurrentLineIndex(lines, p.currentMs)
+  const hasTrans = lines.some((l) => 'trans' in l && (l as { trans?: string }).trans)
+  const displayLines = showTrans ? lines : lines.map((l) => ({ timeMs: l.timeMs, text: l.text }))
 
   // 打开时锁住背后页面滚动,避免歌词区以外滑动穿透到底层(歌单等)
   useEffect(() => {
@@ -62,6 +72,9 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
         <button className="tap iconbtn" onClick={() => setShowQueue(true)} aria-label="播放队列">
           <Icon name="queue" size={22} />
         </button>
+        {hasTrans && (
+          <button className={`tap iconbtn trans-btn ${showTrans ? 'on' : ''}`} onClick={toggleTrans} aria-label="翻译">译</button>
+        )}
       </div>
 
       <div className="np-lyrics">
@@ -69,7 +82,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
           ? <div className="np-nolyric">纯音乐 · 请欣赏</div>
           : lines.length === 0
             ? <div className="np-nolyric">暂无歌词</div>
-            : <LyricsView lines={lines} activeIndex={active} onSeek={(ms) => p.seek(ms)} />)}
+            : <LyricsView lines={displayLines} activeIndex={active} onSeek={(ms) => p.seek(ms)} />)}
       </div>
 
       <div className="np-progress">
