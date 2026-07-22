@@ -1,4 +1,4 @@
-const TABS: [string, string][] = [['daily', '日推'], ['playlists', '歌单'], ['search', '搜索']]
+const TABS: [string, string][] = [['daily', '日推'], ['discover', '发现'], ['playlists', '歌单'], ['search', '搜索']]
 
 export function TabBar({ tab, onTab }: { tab: string; onTab: (t: string) => void }) {
   return (

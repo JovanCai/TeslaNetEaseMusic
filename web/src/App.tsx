@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { TabBar } from './components/TabBar'
 import { Daily } from './views/Daily'
+import { Discover } from './views/Discover'
 import { Playlists } from './views/Playlists'
 import { Search } from './views/Search'
 import { Login } from './views/Login'
@@ -62,6 +63,7 @@ export default function App() {
               : (
                 <div key={tab} className="view-anim">
                   {tab === 'daily' && <Daily />}
+                  {tab === 'discover' && <Discover onOpenPlaylist={openPlaylist} />}
                   {tab === 'playlists' && <Playlists onOpenPlaylist={openPlaylist} />}
                   {tab === 'search' && <Search onOpenAlbum={openAlbum} onOpenArtist={openArtist} onOpenPlaylist={openPlaylist} />}
                 </div>

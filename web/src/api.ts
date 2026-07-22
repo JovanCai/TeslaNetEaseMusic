@@ -81,6 +81,23 @@ export async function getUserPlaylists(uid: number): Promise<{ id: number; name:
   return (j?.playlist ?? []).map((p: any) => ({ id: p.id, name: p.name, cover: toHttps(p.coverImgUrl ?? ''), count: p.trackCount ?? 0 }))
 }
 
+function fmtCount(n: number): string {
+  if (n >= 1e8) return `${(n / 1e8).toFixed(1)}亿`
+  if (n >= 1e4) return `${Math.round(n / 1e4)}万`
+  return String(n ?? '')
+}
+
+// 推荐歌单
+export async function getPersonalized(): Promise<Card[]> {
+  const j = await getJson('/personalized?limit=12')
+  return (j?.result ?? []).map((p: any) => ({ id: p.id, name: p.name, cover: toHttps(p.picUrl ?? ''), sub: fmtCount(p.playCount) + ' 播放' }))
+}
+// 排行榜
+export async function getToplists(): Promise<Card[]> {
+  const j = await getJson('/toplist')
+  return (j?.list ?? []).map((l: any) => ({ id: l.id, name: l.name, cover: toHttps(l.coverImgUrl ?? ''), sub: l.updateFrequency ?? '' }))
+}
+
 export async function getLoginStatus(): Promise<{ loggedIn: boolean; uid: number | null; nickname: string | null }> {
   const j = await getJson('/login/status')
   const prof = j?.data?.profile
