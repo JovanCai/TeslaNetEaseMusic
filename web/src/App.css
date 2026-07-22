@@ -7,6 +7,7 @@
   display:flex; align-items:center; justify-content:center; transition:transform .14s ease; }
 .theme-btn:active { transform:scale(.9); }
 .theme-mask { position:fixed; inset:0; z-index:26; }
+.picker-open .fastscroll { display:none; }
 .theme-pop { position:fixed; top:74px; right:14px; z-index:27; padding:8px; display:flex; flex-direction:column; gap:4px; min-width:190px; }
 .theme-row { justify-content:flex-start; gap:12px; padding:8px 12px; border-radius:12px; min-height:52px; }
 .theme-row:active, .theme-row.on { background:var(--surface); }

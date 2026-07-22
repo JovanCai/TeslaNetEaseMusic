@@ -1,10 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { THEMES, loadTheme, applyTheme } from '../ui/themes'
 import { Icon } from './Icon'
 
 export function ThemePicker() {
   const [open, setOpen] = useState(false)
   const [theme, setTheme] = useState(loadTheme())
+
+  // 打开面板时隐藏右侧快速滑块,避免从面板边露出
+  useEffect(() => {
+    document.body.classList.toggle('picker-open', open)
+    return () => document.body.classList.remove('picker-open')
+  }, [open])
 
   function pick(id: string) {
     applyTheme(id)
