@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { usePlayer } from './PlayerContext'
 import { parseLrc, getCurrentLineIndex } from '../lyrics/parseLrc'
 import { LyricsView } from '../lyrics/LyricsView'
@@ -14,6 +14,15 @@ export function NowPlaying({ open, onClose }: { open: boolean; onClose: () => vo
   const p = usePlayer()
   const lines = useMemo(() => parseLrc(p.lrc), [p.lrc])
   const active = getCurrentLineIndex(lines, p.currentMs)
+
+  // 打开时锁住背后页面滚动,避免歌词区以外滑动穿透到底层(歌单等)
+  useEffect(() => {
+    if (!open) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [open])
+
   if (!p.current) return null
 
   return (
