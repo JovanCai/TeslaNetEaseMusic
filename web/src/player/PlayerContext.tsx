@@ -133,6 +133,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // 用 ref 读取最新 isPlaying:异步取到播放地址时决定是否立即播放(恢复态默认不播,等用户按播放)
   const isPlayingRef = useRef(state.isPlaying)
   isPlayingRef.current = state.isPlaying
+  const seekRef = useRef(seek)
+  seekRef.current = seek
 
   // 持久化:队列/顺序/位置/设置/音量变化时写入(不含播放进度)
   useEffect(() => {
@@ -184,25 +186,40 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       .finally(() => { fetchingRef.current = false })
   }, [state.radar, state.pos, state.order.length])
 
-  // Media Session:让车机/系统的“正在播放”显示专辑封面+歌名,并响应媒体键
+  // Media Session 媒体键:只注册一次,逐个 try/catch —— 某个动作在车机内核不支持而抛错时,
+  // 不会中断后面动作的注册(此前 prev/next 就是被中途抛错拖累而未注册、按键变灰)。
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return
+    const ms = navigator.mediaSession
+    const set = (action: MediaSessionAction, handler: MediaSessionActionHandler) => {
+      try { ms.setActionHandler(action, handler) } catch { /* 该动作不支持则跳过 */ }
+    }
+    set('play', () => { if (!isPlayingRef.current) dispatch({ type: 'toggle' }) })
+    set('pause', () => { if (isPlayingRef.current) dispatch({ type: 'toggle' }) })
+    set('previoustrack', () => dispatch({ type: 'prev' }))
+    set('nexttrack', () => dispatch({ type: 'next' }))
+    set('seekto', (d) => { if (d.seekTime != null) seekRef.current(d.seekTime * 1000) })
+  }, [])
+
+  // Media Session 元数据:封面 + 歌名。车机媒体卡片副标题被浏览器占用来显示页面 URL、
+  // 不渲染 artist 字段,所以把歌手并进标题行,保证车机上能看到歌手名。
   useEffect(() => {
     if (!('mediaSession' in navigator)) return
     const ms = navigator.mediaSession
     if (!current) { ms.metadata = null; document.title = 'TeslaNetEaseMusic'; return }
     const cover = current.cover
-    ms.metadata = new MediaMetadata({
-      title: current.name,
-      artist: current.artist,
-      artwork: cover
-        ? [128, 256, 512].map((s) => ({ src: `${cover}?param=${s}y${s}`, sizes: `${s}x${s}`, type: 'image/jpeg' }))
-        : [],
-    })
+    const title = current.artist ? `${current.name} · ${current.artist}` : current.name
+    try {
+      ms.metadata = new MediaMetadata({
+        title,
+        artist: current.artist,
+        album: current.artist, // 冗余兜底:部分车机副标题取 album
+        artwork: cover
+          ? [128, 256, 512].map((s) => ({ src: `${cover}?param=${s}y${s}`, sizes: `${s}x${s}`, type: 'image/jpeg' }))
+          : [],
+      })
+    } catch { /* 老内核不支持 MediaMetadata 则跳过 */ }
     document.title = `${current.name} - ${current.artist}`
-    ms.setActionHandler('play', () => { if (!isPlayingRef.current) dispatch({ type: 'toggle' }) })
-    ms.setActionHandler('pause', () => { if (isPlayingRef.current) dispatch({ type: 'toggle' }) })
-    ms.setActionHandler('previoustrack', () => dispatch({ type: 'prev' }))
-    ms.setActionHandler('nexttrack', () => dispatch({ type: 'next' }))
-    try { ms.setActionHandler('seekto', (d) => { if (d.seekTime != null) seek(d.seekTime * 1000) }) } catch { /* 不支持则忽略 */ }
   }, [current?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
