@@ -58,6 +58,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
       const l = el.getBoundingClientRect()
       const dx = f.left - l.left, dy = f.top - l.top
       const sx = l.width ? f.width / l.width : 1, sy = l.height ? f.height / l.height : 1
+      el.style.willChange = 'transform' // 仅动画期间加,避免常驻改变 fixed 定位基准
       el.style.transition = 'none'
       el.style.transformOrigin = 'top left'
       el.style.transform = `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`
@@ -68,7 +69,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
         el.style.transition = 'transform .5s cubic-bezier(.2,.85,.25,1)'
         el.style.transform = ''
       })
-      const clear = () => els.forEach((el) => { el.style.transition = ''; el.style.transformOrigin = '' })
+      const clear = () => els.forEach((el) => { el.style.transition = ''; el.style.transformOrigin = ''; el.style.willChange = '' })
       window.setTimeout(clear, 560)
     })
   }, [layout])
@@ -96,6 +97,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
 
   return (
     <div ref={npRef} className={`np ${layout} ${open ? 'open' : ''}`} aria-hidden={!open}>
+      <button className={`np-layout-toggle tap iconbtn ${layout === 'split' ? 'on' : ''}`} onClick={toggleLayout} aria-label="切换分栏布局"><Icon name="layout" size={22} /></button>
       <div className="np-top" data-flip="top">
         {cur.cover && <img className="np-cover" src={cur.cover} alt="" />}
         <div className="np-title">{cur.name}</div>
@@ -108,7 +110,6 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
           {cur.albumId > 0 && <button className="tap iconbtn" onClick={() => onOpenAlbum(cur.albumId)} aria-label="所属专辑"><Icon name="album" size={22} /></button>}
           <button className="tap iconbtn" onClick={() => setShowQueue(true)} aria-label="播放队列"><Icon name="queue" size={22} /></button>
           {hasTrans && <button className={`tap iconbtn trans-btn ${showTrans ? 'on' : ''}`} onClick={toggleTrans} aria-label="翻译">译</button>}
-          <button className={`tap iconbtn ${layout === 'split' ? 'on' : ''}`} onClick={toggleLayout} aria-label="布局"><Icon name="layout" size={22} /></button>
         </div>
       </div>
 
