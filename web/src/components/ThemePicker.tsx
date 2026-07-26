@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { THEMES, AUTO, loadThemePref, setThemePref, applyResolvedTheme } from '../ui/themes'
+import { THEMES, AUTO, loadThemePref, setThemePref, applyResolvedTheme, ensureSunTimes } from '../ui/themes'
 import { Icon } from './Icon'
 
 export function ThemePicker() {
@@ -12,12 +12,15 @@ export function ThemePicker() {
     return () => document.body.classList.remove('picker-open')
   }, [open])
 
-  // 自动模式:定时重算,到点(白天↔夜间)自动切换深/浅
+  // 自动模式:取当日日出日落,并定时重算,到点(白天↔夜间)自动切换深/浅
   useEffect(() => {
     applyResolvedTheme()
     if (pref !== AUTO) return
-    const t = window.setInterval(applyResolvedTheme, 60_000)
-    return () => window.clearInterval(t)
+    let alive = true
+    const tick = () => { ensureSunTimes().then(() => { if (alive) applyResolvedTheme() }) }
+    tick()
+    const t = window.setInterval(tick, 60_000) // ensureSunTimes 当日已缓存则直接返回,仅跨日会真正联网
+    return () => { alive = false; window.clearInterval(t) }
   }, [pref])
 
   function pick(id: string) {

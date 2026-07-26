@@ -8,16 +8,44 @@ export const THEMES = [
 
 const KEY = 'tm.theme'
 const DARK_KEY = 'tm.darktheme'
+const SUN_KEY = 'tm.suntimes'
 export const AUTO = 'auto'
 
-// 白天时段(本地时间):此区间用浅色,其余用深色。
-// 改这里必须同步 index.html 的启动内联脚本(否则刷新时会先按旧逻辑闪一下)。
-const DAY_START = 6
-const DAY_END = 18
+// 取不到日出日落时的回退窗口(本地时间)。改这里要同步 index.html 的启动脚本。
+const FALLBACK_DAY_START = 6
+const FALLBACK_DAY_END = 18
 
-export function isDaytime(d = new Date()): boolean {
-  const h = d.getHours()
-  return h >= DAY_START && h < DAY_END
+function localDateStr(d = new Date()): string {
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
+}
+
+function loadSun(): { d: string; rise: number; set: number } | null {
+  try { return JSON.parse(localStorage.getItem(SUN_KEY) || 'null') } catch { return null }
+}
+
+// 是否白天:优先用当日真实日出日落(网络取得并缓存),取不到再回退固定窗口
+export function isDaytime(): boolean {
+  const st = loadSun()
+  if (st && st.d === localDateStr()) { const n = Date.now(); return n >= st.rise && n < st.set }
+  const h = new Date().getHours()
+  return h >= FALLBACK_DAY_START && h < FALLBACK_DAY_END
+}
+
+// 取当日日出日落并缓存(按本地日期):IP 定位 → 日出日落接口。
+// 已有当日缓存则跳过;失败静默(回退固定窗口)。仅自动模式下调用。
+export async function ensureSunTimes(): Promise<void> {
+  const st = loadSun()
+  if (st && st.d === localDateStr()) return
+  try {
+    const loc = await fetch('https://ipwho.is/').then((r) => r.json())
+    const lat = loc?.latitude, lng = loc?.longitude
+    if (typeof lat !== 'number' || typeof lng !== 'number') return
+    const s = await fetch(`https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lng}&formatted=0`).then((r) => r.json())
+    if (s?.status !== 'OK') return
+    const rise = Date.parse(s.results.sunrise), set = Date.parse(s.results.sunset)
+    if (!rise || !set) return
+    localStorage.setItem(SUN_KEY, JSON.stringify({ d: localDateStr(), rise, set }))
+  } catch { /* 网络/CORS 失败:静默回退固定窗口 */ }
 }
 
 // 用户偏好:某个主题 id,或 'auto'
