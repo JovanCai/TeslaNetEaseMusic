@@ -6,6 +6,9 @@ services:
       - ENABLE_GENERAL_UNBLOCK=${ENABLE_UNBLOCK:-false}
     restart: unless-stopped
   app:
+    # 部署端可直接 pull GitHub Actions 预构建的镜像(无需本地编译);
+    # 本地开发用 docker compose up --build 会按 build 重新构建并覆盖此 tag。
+    image: ghcr.io/jovancai/teslaneteasemusic:latest
     build:
       context: .
     depends_on: [ncm-api]

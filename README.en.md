@@ -80,6 +80,7 @@ Settings are provided through a `.env` file in the project root. Redeploy after 
 - Each instance is deployed by the user and signed in to their own NetEase account.
 - The login cookie lives only in a server-side volume — never in frontend code, browser storage, or a URL.
 - Playback depends on your own account's rights; region unlock is off by default, and enabling it is your decision.
+- **Anyone who opens the public URL lands in your logged-in session** — put a login gate in front of it, e.g. Cloudflare Access (see the "Security" section in [DEPLOY.md](DEPLOY.md)).
 
 ## License
 

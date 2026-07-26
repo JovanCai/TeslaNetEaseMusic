@@ -115,10 +115,27 @@ docker compose up -d --build
 
 ---
 
+## 安全:给公网地址加登录门禁(强烈建议)
+
+拿到公网地址后务必注意:**本程序在服务端已登录你的网易云账号,任何打开该地址的人进来就是你的账号**——能点红心、看你的歌单/日推、用你账号播放。而这个 URL 会经证书透明日志、子域名扫描等被发现,不能只靠"没人知道"。
+
+推荐用 **Cloudflare Access**(零信任门禁,免费、无需改代码)在隧道前加一道登录:
+
+1. [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → **Access → Applications → Add an application** → 选 **Self-hosted and private**,子标签切到 **Public DNS**(保护公开域名,而非需要 WARP 的私有资源)。
+2. **Destinations → Public hostnames**:填你的子域名与域名(如 `music` + `你的域名.com`)。
+3. **Access policies → Create new policy**:Action = **Allow**,Include → **Emails** → 填你能收验证码的邮箱。
+4. **Details → Session Duration**:选长一些(如 `1 month`),车上少重登。
+5. 保存(默认用 One-time PIN 邮箱验证码)。
+
+之后访问该地址会先跳 Cloudflare 登录,输一次邮箱验证码才放行;车机登一次,有效期内免验。程序自身的网易云扫码登录不受影响。
+
+---
+
 ## 常见问题
 
 - **启用区域解锁 / 灰歌解锁**:在 `.env` 设置 `REGION_UNLOCK=true` 或 `ENABLE_UNBLOCK=true`,执行 `docker compose up -d`(运行时生效,无需重建)。
 - **切换账号 / cookie 过期**:执行 `docker compose exec app rm -f /data/cookie && docker compose restart app`,再打开页面扫码。(Mac 上可直接运行 `./relogin.sh`。)
 - **车机无法打开地址**:确认使用的是 HTTPS 地址(隧道或 Caddy 提供),车机对纯 HTTP 较为敏感。
-- **升级版本**:执行 `git pull && docker compose up -d --build`,cookie 位于数据卷,不受影响。
+- **升级版本(部署端)**:执行 `./update.sh` —— 拉取最新配置 + 拉取 GitHub Actions 预构建镜像(`ghcr.io/jovancai/teslaneteasemusic`)+ 重启,**无需在本机编译**,群晖会自动按需 `sudo`。cookie 位于数据卷,不受影响。
+- **本地开发构建**:改了源码想本地编译,用 `docker compose up -d --build`(会按 `build:` 重建镜像)。
 - **端口冲突**:在 `.env` 中设置 `APP_PORT` 更换为空闲端口。
