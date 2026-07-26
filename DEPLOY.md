@@ -10,6 +10,8 @@
 
 **先决条件**:已安装 Docker;一部手机用于扫码登录(仅需一次)。
 
+> **无需本地编译**:`docker compose` 会**拉取 GitHub Actions 预构建的镜像**(`ghcr.io/jovancai/teslaneteasemusic`),部署端不用自己 build。日常更新只要一条 [`./update.sh`](#update)。只有你**改了源码**才需要加 `--build` 本地构建。
+
 ---
 
 <a id="mac"></a>
@@ -58,7 +60,7 @@ cp .env.example .env
 
 **方式一:快速隧道(免费,地址临时;群晖常开时基本稳定)**
 ```bash
-docker compose --profile quick up -d --build
+docker compose --profile quick up -d
 # 等待约十余秒后获取地址:
 docker compose logs cloudflared-quick | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com'
 ```
@@ -73,7 +75,7 @@ docker compose logs cloudflared-quick | grep -o 'https://[a-z0-9-]*\.trycloudfla
    - Type 选择 **HTTP**,URL 填 `app:80`,保存。
 4. 将 token 写入 `.env`:`CLOUDFLARE_TUNNEL_TOKEN=粘贴该 token`,然后:
    ```bash
-   docker compose --profile tunnel up -d --build
+   docker compose --profile tunnel up -d
    ```
 
 ### 4) 登录
@@ -109,25 +111,41 @@ docker compose logs cloudflared-quick | grep -o 'https://[a-z0-9-]*\.trycloudfla
 ```bash
 git clone https://github.com/JovanCai/TeslaNetEaseMusic.git && cd TeslaNetEaseMusic
 cp .env.example .env
-docker compose up -d --build
+docker compose up -d
 ```
 打开 `https://music.你的域名.com` 扫码登录即可。
 
 ---
 
-## 安全:给公网地址加登录门禁(强烈建议)
+<a id="update"></a>
 
-拿到公网地址后务必注意:**本程序在服务端已登录你的网易云账号,任何打开该地址的人进来就是你的账号**——能点红心、看你的歌单/日推、用你账号播放。而这个 URL 会经证书透明日志、子域名扫描等被发现,不能只靠"没人知道"。
+## 更新
 
-推荐用 **Cloudflare Access**(零信任门禁,免费、无需改代码)在隧道前加一道登录:
+镜像由 GitHub Actions 在每次代码更新后自动构建、推送到 GHCR,部署端不用本地编译。更新一条命令:
 
-1. [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → **Access → Applications → Add an application** → 选 **Self-hosted and private**,子标签切到 **Public DNS**(保护公开域名,而非需要 WARP 的私有资源)。
-2. **Destinations → Public hostnames**:填你的子域名与域名(如 `music` + `你的域名.com`)。
+```bash
+./update.sh
+```
+
+它做的事:`git pull`(拿 compose / 脚本变更)→ 拉最新镜像 → 重启 → 清理旧镜像。群晖等需要 root 的机器会自动按需 `sudo`。cookie 在数据卷里,更新不受影响。
+
+> 想临时回到本地编译(比如改了源码本地试),用 `docker compose --profile tunnel up -d --build`。
+
+---
+
+## 安全:给公网地址加登录门禁
+
+程序在服务端已登录你的账号,所以**谁打开这个地址,进来就是你的账号**:能点红心、翻你的歌单、用你账号播放。域名也能通过证书透明日志之类被搜到,加一道登录更稳妥。
+
+用 **Cloudflare Access**(免费,不改代码)在隧道前挡一层:
+
+1. [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → **Access → Applications → Add an application** → 选 **Self-hosted and private**,子标签切到 **Public DNS**(保护公开域名;**不是** WARP 那种私有资源)。
+2. **Destinations → Public hostnames**:填子域名 + 域名(如 `music` + `你的域名.com`)。
 3. **Access policies → Create new policy**:Action = **Allow**,Include → **Emails** → 填你能收验证码的邮箱。
-4. **Details → Session Duration**:选长一些(如 `1 month`),车上少重登。
-5. 保存(默认用 One-time PIN 邮箱验证码)。
+4. **Details → Session Duration**:设长一点(如 `1 month`),车上少重登。
+5. 保存(默认走邮箱验证码 One-time PIN)。
 
-之后访问该地址会先跳 Cloudflare 登录,输一次邮箱验证码才放行;车机登一次,有效期内免验。程序自身的网易云扫码登录不受影响。
+配好后打开地址会先跳 Cloudflare 登录,输一次邮箱验证码才放行;车机登一次,有效期内免验。网易云的扫码登录不受影响。
 
 ---
 
@@ -136,6 +154,5 @@ docker compose up -d --build
 - **启用区域解锁 / 灰歌解锁**:在 `.env` 设置 `REGION_UNLOCK=true` 或 `ENABLE_UNBLOCK=true`,执行 `docker compose up -d`(运行时生效,无需重建)。
 - **切换账号 / cookie 过期**:执行 `docker compose exec app rm -f /data/cookie && docker compose restart app`,再打开页面扫码。(Mac 上可直接运行 `./relogin.sh`。)
 - **车机无法打开地址**:确认使用的是 HTTPS 地址(隧道或 Caddy 提供),车机对纯 HTTP 较为敏感。
-- **升级版本(部署端)**:执行 `./update.sh` —— 拉取最新配置 + 拉取 GitHub Actions 预构建镜像(`ghcr.io/jovancai/teslaneteasemusic`)+ 重启,**无需在本机编译**,群晖会自动按需 `sudo`。cookie 位于数据卷,不受影响。
-- **本地开发构建**:改了源码想本地编译,用 `docker compose up -d --build`(会按 `build:` 重建镜像)。
+- **升级版本**:一条命令 `./update.sh`,详见上文[更新](#update)。
 - **端口冲突**:在 `.env` 中设置 `APP_PORT` 更换为空闲端口。

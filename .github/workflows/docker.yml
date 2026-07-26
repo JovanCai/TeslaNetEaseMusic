@@ -6,6 +6,9 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+    paths-ignore:      # 纯文档改动不触发镜像构建
+      - '**.md'
+      - 'docs/**'
   workflow_dispatch:
 
 permissions:

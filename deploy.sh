@@ -19,10 +19,10 @@ ok "Docker 正常"
 # 2) 配置文件
 if [ ! -f .env ]; then cp .env.example .env; ok "已生成 .env(默认配置即可)"; fi
 
-# 3) 起服务(首次会构建镜像,约 1–2 分钟)
-say "启动服务中(首次构建稍慢,请稍候)……"
+# 3) 起服务(首次拉取预构建镜像,约 1 分钟)
+say "启动服务中(首次拉取镜像稍慢,请稍候)……"
 set -a; . ./.env; set +a
-docker compose up -d --build >/dev/null
+docker compose up -d >/dev/null
 ok "服务已启动"
 
 # 4) 等就绪(等到 ncm-api 也起来、能出二维码,避免刚打开页面时后端还没好)

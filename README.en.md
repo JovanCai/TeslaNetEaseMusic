@@ -73,7 +73,7 @@ Settings are provided through a `.env` file in the project root. Redeploy after 
 ## Maintenance
 
 - **Re-login / switch account** — run `./relogin.sh`, then scan again.
-- **Update** — `git pull`, then run `./deploy.sh` again; the login is preserved.
+- **Update** — one command, `./update.sh`: pulls the prebuilt image and restarts, no local build on the deployment host; the login is preserved.
 
 ## Privacy & security
 
