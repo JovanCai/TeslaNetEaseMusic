@@ -21,7 +21,7 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
         <Icon name={p.isLiked(cur.id) ? 'heartFilled' : 'heart'} size={24} />
       </button>
       <button className="tap iconbtn" onClick={p.prev} aria-label="上一首"><Icon name="prev" size={26} /></button>
-      <button className="tap iconbtn" onClick={p.toggle} aria-label="播放/暂停"><Icon name={p.isPlaying ? 'pause' : 'play'} size={28} /></button>
+      <button className="tap iconbtn mini-play" onClick={p.toggle} aria-label="播放/暂停"><Icon name={p.isPlaying ? 'pause' : 'play'} size={28} /></button>
       <button className="tap iconbtn" onClick={p.next} aria-label="下一首"><Icon name="next" size={26} /></button>
     </div>
   )

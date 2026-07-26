@@ -17,6 +17,15 @@
 .mini-meta { min-width:0; }
 .mini-name { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .mini-artist { color:var(--text-2); font-size:.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* 车机/宽屏:加大迷你条控制键,方便驾驶中盲按(右舵手从右侧够,最右为“下一首”)。
+   窄屏(手机)保持原尺寸,避免挤压歌曲信息。 */
+@media (min-width:821px) {
+  .mini { padding:10px 16px; gap:10px; }
+  .mini > .iconbtn { min-width:80px; height:80px; }
+  .mini > .iconbtn svg { width:34px; height:34px; }
+  .mini > .mini-play { min-width:96px; height:96px; }
+  .mini > .mini-play svg { width:46px; height:46px; }
+}
 
 /* ---- 全屏播放页 ---- */
 .np { position:fixed; inset:0; z-index:30; display:grid; align-items:stretch;
