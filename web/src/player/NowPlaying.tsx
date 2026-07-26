@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { usePlayer } from './PlayerContext'
 import { parseLrc, getCurrentLineIndex } from '../lyrics/parseLrc'
 import { LyricsView } from '../lyrics/LyricsView'
@@ -20,6 +20,18 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
   const p = usePlayer()
   const npRef = useRef<HTMLDivElement>(null)
   const flipFirst = useRef<Map<string, DOMRect> | null>(null)
+  // 歌词字号随歌词区宽度缩放:区域越大字越大。用回调 ref,在歌词 div 挂载时精确接上 ResizeObserver
+  const roRef = useRef<ResizeObserver | null>(null)
+  const lyricsRef = useCallback((el: HTMLDivElement | null) => {
+    roRef.current?.disconnect()
+    if (el && typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => {
+        el.style.setProperty('--lyric-font', `${Math.max(20, Math.min(32, el.clientWidth * 0.03))}px`)
+      })
+      ro.observe(el)
+      roRef.current = ro
+    }
+  }, [])
   const [showQueue, setShowQueue] = useState(false)
   const [showTrans, setShowTrans] = useState(() => {
     try { return localStorage.getItem('tm.showtrans') !== '0' } catch { return true }
@@ -27,6 +39,30 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
   const [layout, setLayout] = useState(() => {
     try { return localStorage.getItem('tm.nplayout') || 'center' } catch { return 'center' }
   })
+  // 分栏左栏宽度(可拖动分隔条调整,记忆到本地)。下限 340,上限取视口 62% 与 760 的较小值。
+  const [splitW, setSplitW] = useState(() => {
+    try {
+      const v = Number(localStorage.getItem('tm.splitw')) || 440
+      return Math.max(340, Math.min(760, window.innerWidth * 0.62, v))
+    } catch { return 440 }
+  })
+  const splitWRef = useRef(splitW)
+  splitWRef.current = splitW
+  function onDividerDown(e: React.PointerEvent) {
+    e.preventDefault()
+    const startX = e.clientX, startW = splitWRef.current
+    const maxW = Math.min(760, window.innerWidth * 0.62)
+    const move = (ev: PointerEvent) => setSplitW(Math.max(340, Math.min(maxW, startW + (ev.clientX - startX))))
+    const up = () => {
+      document.removeEventListener('pointermove', move)
+      document.removeEventListener('pointerup', up)
+      document.body.style.userSelect = ''
+      try { localStorage.setItem('tm.splitw', String(Math.round(splitWRef.current))) } catch { /* 忽略 */ }
+    }
+    document.body.style.userSelect = 'none'
+    document.addEventListener('pointermove', move)
+    document.addEventListener('pointerup', up)
+  }
   function toggleTrans() {
     const v = !showTrans
     setShowTrans(v)
@@ -96,8 +132,10 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
   const cur = p.current
 
   return (
-    <div ref={npRef} className={`np ${layout} ${open ? 'open' : ''}`} aria-hidden={!open}>
+    <div ref={npRef} className={`np ${layout} ${open ? 'open' : ''} ${layout === 'split' && splitW < 430 ? 'ctl-sm' : ''}`}
+      style={{ ['--splitw' as string]: `${splitW}px` }} aria-hidden={!open}>
       <button className={`np-layout-toggle tap iconbtn ${layout === 'split' ? 'on' : ''}`} onClick={toggleLayout} aria-label="切换分栏布局"><Icon name="layout" size={22} /></button>
+      {layout === 'split' && <div className="np-divider" onPointerDown={onDividerDown} role="separator" aria-label="拖动调整歌词区宽度" />}
       <div className="np-top" data-flip="top">
         {cur.cover && <img className="np-cover" src={cur.cover} alt="" />}
         <div className="np-title">{cur.name}</div>
@@ -113,7 +151,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
         </div>
       </div>
 
-      <div className="np-lyrics" data-flip="lyrics">
+      <div ref={lyricsRef} className="np-lyrics" data-flip="lyrics">
         {open && (p.pureMusic
           ? <div className="np-nolyric">纯音乐 · 请欣赏</div>
           : lines.length === 0
