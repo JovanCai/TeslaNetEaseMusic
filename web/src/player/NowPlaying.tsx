@@ -63,6 +63,30 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
     document.addEventListener('pointermove', move)
     document.addEventListener('pointerup', up)
   }
+
+  // 手势切歌:在非交互区域横向划动。左→右(dx>0)下一首,右→左上一首。
+  const swipeStart = useRef<{ x: number; y: number } | null>(null)
+  const swipedRef = useRef(false)
+  function onNpPointerDown(e: React.PointerEvent) {
+    const t = e.target as HTMLElement
+    // 排除按钮/滑块/分隔条/操作排,避免与点击、拖动进度/音量/分隔条冲突
+    if (t.closest('button, input, .np-divider, .np-actions')) { swipeStart.current = null; return }
+    swipeStart.current = { x: e.clientX, y: e.clientY }
+  }
+  function onNpPointerUp(e: React.PointerEvent) {
+    const s = swipeStart.current
+    swipeStart.current = null
+    if (!s) return
+    const dx = e.clientX - s.x, dy = e.clientY - s.y
+    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.4) { // 横向为主的明显划动
+      swipedRef.current = true
+      if (dx > 0) p.next(); else p.prev()
+    }
+  }
+  function onNpClickCapture(e: React.MouseEvent) {
+    // 划动后抑制随之而来的点击(避免误触歌词跳转)
+    if (swipedRef.current) { e.stopPropagation(); e.preventDefault(); swipedRef.current = false }
+  }
   function toggleTrans() {
     const v = !showTrans
     setShowTrans(v)
@@ -133,9 +157,14 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
 
   return (
     <div ref={npRef} className={`np ${layout} ${open ? 'open' : ''} ${layout === 'split' && splitW < 430 ? 'ctl-sm' : ''}`}
-      style={{ ['--splitw' as string]: `${splitW}px` }} aria-hidden={!open}>
+      style={{ ['--splitw' as string]: `${splitW}px` }} aria-hidden={!open}
+      onPointerDown={onNpPointerDown} onPointerUp={onNpPointerUp} onClickCapture={onNpClickCapture}>
       <button className={`np-layout-toggle tap iconbtn ${layout === 'split' ? 'on' : ''}`} onClick={toggleLayout} aria-label="切换分栏布局"><Icon name="layout" size={22} /></button>
-      {layout === 'split' && <div className="np-divider" onPointerDown={onDividerDown} role="separator" aria-label="拖动调整歌词区宽度" />}
+      {layout === 'split' && (
+        <div className="np-divider" onPointerDown={onDividerDown} role="separator" aria-label="拖动调整歌词区宽度">
+          <span className="np-handle"><Icon name="resizeLR" size={18} /></span>
+        </div>
+      )}
       <div className="np-top" data-flip="top">
         {cur.cover && <img className="np-cover" src={cur.cover} alt="" />}
         <div className="np-title">{cur.name}</div>
@@ -147,7 +176,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
           {cur.artistId > 0 && <button className="tap iconbtn" onClick={() => onOpenArtist(cur.artistId)} aria-label="歌手"><Icon name="artist" size={22} /></button>}
           {cur.albumId > 0 && <button className="tap iconbtn" onClick={() => onOpenAlbum(cur.albumId)} aria-label="所属专辑"><Icon name="album" size={22} /></button>}
           <button className="tap iconbtn" onClick={() => setShowQueue(true)} aria-label="播放队列"><Icon name="queue" size={22} /></button>
-          {hasTrans && <button className={`tap iconbtn trans-btn ${showTrans ? 'on' : ''}`} onClick={toggleTrans} aria-label="翻译">译</button>}
+          <button className={`tap iconbtn trans-btn ${hasTrans && showTrans ? 'on' : ''}`} onClick={toggleTrans} disabled={!hasTrans} aria-label="翻译">译</button>
         </div>
       </div>
 

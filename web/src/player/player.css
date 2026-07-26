@@ -43,13 +43,14 @@
 .np.split { grid-template-columns:var(--splitw,440px) 1fr; grid-template-rows:1fr auto auto 1fr;
   grid-template-areas:". lyrics" "top lyrics" "bottom lyrics" ". lyrics";
   justify-items:center; column-gap:32px; }
-/* 左右分隔条:拖动改变左栏/歌词区宽度。位于两栏之间的 gap 内。 */
-.np-divider { position:absolute; top:0; bottom:0; left:calc(20px + var(--splitw,440px)); width:32px; z-index:4;
-  display:flex; align-items:center; justify-content:center; cursor:col-resize; touch-action:none; }
-.np-divider::before { content:''; width:5px; height:84px; border-radius:3px; background:rgba(var(--accent-rgb),.45);
-  transition:background .2s ease, height .2s ease, box-shadow .2s ease; }
-.np-divider:hover::before, .np-divider:active::before { background:var(--accent); height:120px;
-  box-shadow:0 0 14px rgba(var(--accent-rgb),.7); }
+/* 左右分隔条:拖动改变左栏/歌词区宽度。做成带左右箭头(‹ ›)的把手,区别于滑块。 */
+.np-divider { position:absolute; top:0; bottom:0; left:calc(20px + var(--splitw,440px)); width:36px; margin-left:-2px;
+  z-index:4; display:flex; align-items:center; justify-content:center; cursor:col-resize; touch-action:none; }
+.np-handle { display:flex; align-items:center; justify-content:center; width:30px; height:54px; border-radius:15px;
+  background:var(--surface); border:1px solid var(--border); color:var(--text-2);
+  box-shadow:0 2px 10px rgba(0,0,0,.35); transition:color .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.np-divider:hover .np-handle, .np-divider:active .np-handle { color:var(--accent);
+  border-color:rgba(var(--accent-rgb),.7); box-shadow:0 0 14px rgba(var(--accent-rgb),.5); }
 
 /* 上/下两块:FLIP 动画时由 JS 施加 transform 从旧位置飞到新位置。
    注意不要常驻 will-change:transform —— 它会成为 position:fixed 的定位基准,
@@ -57,7 +58,9 @@
 .np-top { grid-area:top; display:flex; flex-direction:column; align-items:center; max-width:100%; }
 .np-bottom { grid-area:bottom; display:flex; flex-direction:column; align-items:center; width:100%; }
 .np.split .np-cover { width:150px; height:150px; }
-.np.split .np-actions { flex-wrap:wrap; justify-content:center; }
+/* 5 个操作键始终一行:即使左栏拖到最窄(340)也不换行,缩小键宽与间距容纳 */
+.np.split .np-actions { flex-wrap:nowrap; justify-content:center; gap:6px; }
+.np.split .np-actions .iconbtn { min-width:58px; }
 
 /* 分栏切换:独立到左上角(右上角留给主题按钮),不再混进会换行的操作排(“译”异步出现就不会再挤乱左栏) */
 .np-layout-toggle { position:absolute; top:16px; left:16px; z-index:3;
@@ -97,9 +100,10 @@
 .np-actions { display:flex; gap:8px; margin-top:6px; }
 .iconbtn.liked { color:#ff4d6d; filter:drop-shadow(0 0 8px rgba(255,77,109,.6)); }
 .trans-btn { font-weight:700; font-size:1.15rem; }
+.trans-btn:disabled { color:var(--text-2); opacity:.4; } /* 无翻译:灰色常驻占位;有翻译则恢复白色可点 */
 
 /* ---- 歌词:当前行 neon 高亮 + 平滑滚动 ---- */
-.np-lyrics { grid-area:lyrics; justify-self:stretch; align-self:stretch; width:100%; min-width:0; min-height:0; overflow-y:auto; overscroll-behavior:contain; margin:0; -webkit-mask-image:linear-gradient(180deg,transparent,#000 18%,#000 82%,transparent); mask-image:linear-gradient(180deg,transparent,#000 18%,#000 82%,transparent); }
+.np-lyrics { grid-area:lyrics; justify-self:stretch; align-self:stretch; width:100%; min-width:0; min-height:0; overflow-y:auto; overscroll-behavior:contain; margin:0; touch-action:pan-y; -webkit-mask-image:linear-gradient(180deg,transparent,#000 18%,#000 82%,transparent); mask-image:linear-gradient(180deg,transparent,#000 18%,#000 82%,transparent); }
 .np-lyrics::-webkit-scrollbar { display:none; }
 .lyrics { text-align:center; padding:34vh 24px; display:flex; flex-direction:column; gap:14px; }
 .line { font-size:var(--lyric-font,1.4rem); line-height:1.5; color:var(--text-2); opacity:.55; cursor:pointer; overflow-wrap:anywhere;
