@@ -10,7 +10,7 @@ A self-hosted online player for Tesla owners who cannot access NetEase Cloud Mus
 
 - **Self-hosted** — every user runs an independent instance; no shared data.
 - **Credential isolation** — the login cookie is stored only in a server-side volume; neither the frontend nor the car's browser ever holds it.
-- **Optimized for the car** — large controls, dark high-contrast UI, karaoke-style scrolling lyrics, with both centered and split layouts.
+- **Optimized for the car** — large controls, dark high-contrast UI, karaoke-style scrolling lyrics; centered and split layouts, and swipe-to-change-track, suited to driving.
 - **Public access** — a bundled Cloudflare Tunnel provides an HTTPS URL without a public IP.
 
 ## Features
@@ -18,7 +18,10 @@ A self-hosted online player for Tesla owners who cannot access NetEase Cloud Mus
 - Daily recommendations, your playlists, search, Personal FM (a personalized radio stream)
 - Playback controls: play/pause, previous/next, shuffle, repeat, seek, volume
 - Karaoke-style scrolling lyrics with translation; instrumentals show a placeholder
-- Five themes, album and artist pages, play queue, likes
+- Two now-playing layouts (centered / split); the split view has a draggable divider to resize the lyrics area, and the lyric font scales with its width
+- Driving-friendly: swipe to change track (left→right next, right→left previous), enlarged controls and mini-player buttons
+- Themes: five color schemes, plus an "auto" mode that switches light/dark by your real sunrise and sunset
+- Album and artist pages, play queue, likes
 - Remembers the last queue, position, volume, and settings
 - Media Session integration so the car's system media card shows cover art and track info
 
