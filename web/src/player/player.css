@@ -40,7 +40,7 @@
 .np.center { grid-template-columns:1fr; grid-template-rows:auto minmax(0,1fr) auto;
   grid-template-areas:"top" "lyrics" "bottom"; justify-items:center; }
 /* 分栏布局:控件收进左列,歌词占满右侧;上下 1fr 把左列内容垂直居中 */
-.np.split { grid-template-columns:460px 1fr; grid-template-rows:1fr auto auto 1fr;
+.np.split { grid-template-columns:440px 1fr; grid-template-rows:1fr auto auto 1fr;
   grid-template-areas:". lyrics" "top lyrics" "bottom lyrics" ". lyrics";
   justify-items:center; column-gap:32px; }
 
@@ -62,19 +62,14 @@
   .np-layout-toggle { display:none; }
 }
 
-/* 车机/宽屏:加大播放页控制键,便于触控(分栏歌词视图常用)。
-   窄屏手机保持原尺寸,避免控制排超出屏宽。图标用 CSS 覆盖 Icon 的内联尺寸。 */
+/* 车机/宽屏:只放大「上一首/下一首」到与播放键同大,便于驾驶中点击(常用滚动歌词视图)。
+   其余键、操作排保持原尺寸;窄屏手机不放大,避免控制排超出屏宽。
+   图标用 CSS 覆盖 Icon 的内联尺寸。 */
 @media (min-width:821px) {
-  .np-actions .iconbtn { min-width:72px; height:72px; }
-  .np-actions .iconbtn svg { width:28px; height:28px; }
-  .np-ctl { gap:12px; }
-  .np-ctl .iconbtn { min-width:76px; height:76px; }
-  .np-ctl .iconbtn svg { width:30px; height:30px; }
+  .np-ctl .iconbtn[aria-label="上一首"],
+  .np-ctl .iconbtn[aria-label="下一首"] { min-width:84px; height:84px; }
   .np-ctl .iconbtn[aria-label="上一首"] svg,
-  .np-ctl .iconbtn[aria-label="下一首"] svg { width:36px; height:36px; }
-  /* 权重提到 .np-ctl .iconbtn.play-btn,压过基础的 .np-ctl .play-btn{84}(它在源码更靠后) */
-  .np-ctl .iconbtn.play-btn { width:96px; height:96px; }
-  .np-ctl .iconbtn.play-btn svg { width:44px; height:44px; }
+  .np-ctl .iconbtn[aria-label="下一首"] svg { width:40px; height:40px; }
 }
 .np-cover { width:132px; height:132px; border-radius:20px; margin:0 0 12px; object-fit:cover;
   box-shadow:0 12px 40px rgba(0,0,0,.5), 0 0 0 1px var(--border); }
