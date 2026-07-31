@@ -99,7 +99,7 @@
 .np-cover { width:132px; height:132px; border-radius:20px; margin:0 0 12px; object-fit:cover;
   box-shadow:0 12px 40px rgba(0,0,0,.5), 0 0 0 1px var(--border); animation:npFadeUp .45s ease; }
 /* 切歌时封面 / 歌词丝滑淡入(靠 key=歌曲id 重挂载触发) */
-.np-lyric-fade { min-height:100%; animation:npFade .5s ease; }
+.np-lyric-fade { min-height:100%; display:flex; flex-direction:column; animation:npFade .5s ease; }
 @keyframes npFadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
 @keyframes npFade { from { opacity:0; } to { opacity:1; } }
 .np-collapse { margin-top:8px; padding:0 28px; height:56px; min-height:56px; gap:8px;
@@ -121,12 +121,13 @@
 .np-lyrics::-webkit-scrollbar { display:none; }
 .lyrics { text-align:center; padding:34vh 24px; display:flex; flex-direction:column; gap:14px; }
 .line { font-size:var(--lyric-font,1.4rem); line-height:1.5; color:var(--text-2); opacity:.55; cursor:pointer; overflow-wrap:anywhere;
-  transition: opacity .35s ease, color .35s ease, transform .35s ease, text-shadow .35s ease; transform:scale(.96); }
-.line.active { opacity:1; color:var(--text-strong); font-weight:700; transform:scale(1.14);
-  text-shadow:0 0 18px rgba(var(--accent-rgb),.65); } /* 正在唱的行比其它行明显大一点 */
+  transition: opacity .35s ease, color .35s ease, text-shadow .35s ease; }
+/* 正在唱的行字号更大 —— 用 font-size 而非 transform:scale,长行(如一长串作曲人名)会换行、不会横向溢出 */
+.line.active { opacity:1; color:var(--text-strong); font-weight:700; font-size:calc(var(--lyric-font,1.4rem) * 1.15);
+  text-shadow:0 0 18px rgba(var(--accent-rgb),.65); }
 .line-trans { display:block; font-size:.82em; font-weight:400; color:var(--text-2); margin-top:3px; }
 .line.active .line-trans { color:var(--text); }
-.np-nolyric { display:flex; align-items:center; justify-content:center; height:100%;
+.np-nolyric { flex:1; display:flex; align-items:center; justify-content:center;
   color:var(--text-2); font-size:1.3rem; letter-spacing:2px; }
 
 /* ---- 进度条 + 控制 ---- */
