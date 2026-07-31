@@ -110,10 +110,10 @@ export async function getLikedIds(uid: number): Promise<number[]> {
   return j?.ids ?? []
 }
 
-// 红心/取消红心一首歌
-export async function setLike(id: number, like: boolean): Promise<boolean> {
+// 红心/取消红心一首歌。逻辑失败(HTTP 200 但 code!=200,如会话过期/需验证)也抛错,供上层回滚。
+export async function setLike(id: number, like: boolean): Promise<void> {
   const j = await getJson(`/like?id=${id}&like=${like}&timestamp=${Date.now()}`)
-  return j?.code === 200
+  if (j?.code !== 200) throw new Error(`like ${j?.code}`)
 }
 
 // 专辑详情:名称、封面、曲目

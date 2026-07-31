@@ -1,12 +1,13 @@
-import { usePlayer } from './PlayerContext'
+import { usePlayer, usePlayerProgress } from './PlayerContext'
 import { Icon } from '../components/Icon'
 import './player.css'
 
 export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
   const p = usePlayer()
+  const { currentMs, durationMs } = usePlayerProgress()
   if (!p.current) return null
   const cur = p.current
-  const progress = p.durationMs > 0 ? (p.currentMs / p.durationMs) * 100 : 0
+  const progress = durationMs > 0 ? (currentMs / durationMs) * 100 : 0
   return (
     <div className="mini glass">
       <div className="mini-bar" style={{ width: `${progress}%` }} />

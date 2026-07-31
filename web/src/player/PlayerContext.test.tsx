@@ -39,15 +39,23 @@ describe('playerReducer', () => {
     expect(s.pos).toBe(0); expect(s.isPlaying).toBe(true)
   })
 
-  it('repeat=one:next 保持当前并递增 playToken(触发重放)', () => {
+  it('repeat=one:ended(曲终自动)保持当前并递增 playToken(重放)', () => {
     let s = play(1)
     s = playerReducer(s, { type: 'cycleRepeat' }) // → all
     s = playerReducer(s, { type: 'cycleRepeat' }) // → one
     const before = s.playToken
-    s = playerReducer(s, { type: 'next' })
+    s = playerReducer(s, { type: 'ended' })
     expect(s.pos).toBe(1)
     expect(s.isPlaying).toBe(true)
     expect(s.playToken).toBe(before + 1)
+  })
+
+  it('repeat=one:手动 next 仍前进(不被单曲循环困住)', () => {
+    let s = play(1)
+    s = playerReducer(s, { type: 'cycleRepeat' }) // → all
+    s = playerReducer(s, { type: 'cycleRepeat' }) // → one
+    s = playerReducer(s, { type: 'next' })
+    expect(s.pos).toBe(2) // 从 1 前进到 2,而非停在原地重放
   })
 
   it('shuffle 开启:当前曲打头、order 是全排列、后续走乱序顺序', () => {
@@ -129,5 +137,41 @@ describe('playerReducer', () => {
     expect(s.order).toEqual([1, 2])
     expect(s.pos).toBe(0)
     expect(s.order[s.pos]).toBe(1)
+  })
+
+  it('#4 removeAt 后 setShuffle 不复活已删除的歌', () => {
+    let s = play(0) // queue [a,b,c], order [0,1,2], pos 0
+    s = playerReducer(s, { type: 'removeAt', pos: 1 }) // 删 b(order 下标1 → queue 下标1)
+    expect(s.order).toEqual([0, 2])
+    s = playerReducer(s, { type: 'setShuffle', on: true })
+    expect(s.order).not.toContain(1) // b(queue 下标1)不该回来
+    expect([...s.order].sort()).toEqual([0, 2])
+    s = playerReducer(s, { type: 'setShuffle', on: false })
+    expect(s.order).toEqual([0, 2]) // 关闭也不复活
+  })
+
+  it('#9 暂停时移除当前曲,保持暂停(不强制播放)', () => {
+    let s = play(0)
+    s = playerReducer(s, { type: 'toggle' }) // 暂停
+    expect(s.isPlaying).toBe(false)
+    s = playerReducer(s, { type: 'removeAt', pos: 0 })
+    expect(s.isPlaying).toBe(false)
+  })
+
+  it('#14 删到空队列保留 shuffle/repeat', () => {
+    let s = play(0)
+    s = playerReducer(s, { type: 'setShuffle', on: true })
+    s = playerReducer(s, { type: 'cycleRepeat' }) // → all
+    while (s.order.length) s = playerReducer(s, { type: 'removeAt', pos: 0 })
+    expect(s.order).toEqual([])
+    expect(s.shuffle).toBe(true)
+    expect(s.repeat).toBe('all')
+  })
+
+  it('#11 pos=-1 但队列非空时 enqueue 不丢已有队列', () => {
+    // 构造:空闲态(pos=-1)下有非空 order —— 用 removeAt 到只剩当前后再模拟。直接构造:
+    const base = { ...initialPlayerState, queue: songs, order: [0, 1], pos: -1 }
+    const s = playerReducer(base, { type: 'enqueue', song: d })
+    expect(s.order).toEqual([0, 1, 3]) // 追加到队尾,原有 [0,1] 保留
   })
 })

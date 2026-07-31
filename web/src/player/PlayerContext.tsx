@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react'
 import { nextIndex, prevIndex, buildShuffleOrder, type Repeat } from './queue'
 import { getSongUrl, getLyric, getPersonalFm, getLikedIds, setLike, getLoginStatus, type Song } from '../api'
 import { useAudio } from './useAudio'
@@ -27,7 +27,7 @@ export const initialPlayerState: PlayerState = {
 type Action =
   | { type: 'playList'; songs: Song[]; start: number }
   | { type: 'startRadar'; songs: Song[] } | { type: 'appendSongs'; songs: Song[] }
-  | { type: 'toggle' } | { type: 'next' } | { type: 'prev' } | { type: 'stop' }
+  | { type: 'toggle' } | { type: 'next' } | { type: 'ended' } | { type: 'prev' } | { type: 'stop' }
   | { type: 'setShuffle'; on: boolean } | { type: 'cycleRepeat' }
   | { type: 'setLrc'; lrc: string; tlyric: string; pureMusic: boolean }
   | { type: 'jumpTo'; pos: number } | { type: 'removeAt'; pos: number }
@@ -36,6 +36,7 @@ type Action =
 
 const identity = (n: number) => Array.from({ length: n }, (_, i) => i)
 const curQueueIndex = (s: PlayerState) => (s.pos >= 0 ? s.order[s.pos] : -1)
+const RADAR_CAP = 150, RADAR_KEEP_BEHIND = 40 // 私人FM 队列上限与保留的已播条数
 
 export function playerReducer(s: PlayerState, a: Action): PlayerState {
   switch (a.type) {
@@ -49,24 +50,43 @@ export function playerReducer(s: PlayerState, a: Action): PlayerState {
     case 'appendSongs': {
       const start = s.queue.length
       const appended = a.songs.map((_, i) => start + i)
-      return { ...s, queue: [...s.queue, ...a.songs], order: [...s.order, ...appended] }
+      const combined = [...s.queue, ...a.songs]
+      const order = [...s.order, ...appended]
+      // 私人FM 长时间累积会撑爆内存/localStorage:超上限时裁掉已播的前段并重映射下标(radar 非乱序,order 连续)
+      if (combined.length > RADAR_CAP && s.pos > RADAR_KEEP_BEHIND) {
+        const cut = s.pos - RADAR_KEEP_BEHIND
+        const kept = order.slice(cut)
+        const remap = new Map<number, number>()
+        const queue = kept.map((qi, ni) => { remap.set(qi, ni); return combined[qi] })
+        return { ...s, queue, order: kept.map((qi) => remap.get(qi)!), pos: s.pos - cut }
+      }
+      return { ...s, queue: combined, order }
     }
     case 'toggle': return { ...s, isPlaying: !s.isPlaying }
     case 'stop': return { ...s, isPlaying: false }
-    case 'next': {
+    case 'ended': { // 自动续播(曲终):遵循单曲循环=重播当前
       const p = nextIndex(s.order.length, s.pos, s.repeat)
+      return p < 0 ? { ...s, isPlaying: false } : { ...s, pos: p, isPlaying: true, lrc: '', tlyric: '', pureMusic: false, playToken: s.playToken + 1 }
+    }
+    case 'next': { // 手动下一首 / 跳过死歌:单曲循环下也要真正前进(one 视作 all)
+      const p = nextIndex(s.order.length, s.pos, s.repeat === 'one' ? 'all' : s.repeat)
       return p < 0 ? { ...s, isPlaying: false } : { ...s, pos: p, isPlaying: true, lrc: '', tlyric: '', pureMusic: false, playToken: s.playToken + 1 }
     }
     case 'prev': {
       const p = prevIndex(s.order.length, s.pos)
-      return { ...s, pos: p, lrc: '', tlyric: '', pureMusic: false, playToken: s.playToken + 1 }
+      return { ...s, pos: p, isPlaying: true, lrc: '', tlyric: '', pureMusic: false, playToken: s.playToken + 1 } // 与 next 一致:暂停时按上一首也恢复播放
     }
     case 'setShuffle': {
       const cur = curQueueIndex(s)
-      if (cur < 0) return { ...s, shuffle: a.on, order: identity(s.queue.length), pos: -1 }
-      const order = a.on ? buildShuffleOrder(s.queue.length, cur) : identity(s.queue.length)
-      const pos = a.on ? 0 : cur
-      return { ...s, shuffle: a.on, order, pos } // 仅重排后续,不重启当前曲(不动 playToken)
+      if (cur < 0) return { ...s, shuffle: a.on } // 空闲:只切标志,不用 queue.length 重建 order(否则会复活已删歌/污染空闲态)
+      const members = s.order // 当前在播队列的 queue 下标集合(已删除的不在其中)
+      if (a.on) {
+        const rest = members.filter((i) => i !== cur)
+        for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]] }
+        return { ...s, shuffle: true, order: [cur, ...rest], pos: 0 }
+      }
+      const order = [...members].sort((x, y) => x - y) // 关闭:剩余曲目按自然(队列)顺序
+      return { ...s, shuffle: false, order, pos: order.indexOf(cur) }
     }
     case 'cycleRepeat': {
       const order: Repeat[] = ['off', 'all', 'one']
@@ -80,25 +100,26 @@ export function playerReducer(s: PlayerState, a: Action): PlayerState {
     case 'removeAt': {
       if (a.pos < 0 || a.pos >= s.order.length) return s
       const order = s.order.slice(0, a.pos).concat(s.order.slice(a.pos + 1))
-      if (order.length === 0) return { ...initialPlayerState, queue: s.queue, playToken: s.playToken + 1 }
+      if (order.length === 0) // 清空:保留 shuffle/repeat/radar 等设置,不静默重置
+        return { ...initialPlayerState, queue: s.queue, shuffle: s.shuffle, repeat: s.repeat, radar: s.radar, playToken: s.playToken + 1 }
       if (a.pos < s.pos) return { ...s, order, pos: s.pos - 1 }
-      if (a.pos === s.pos) { // 移除的是当前曲:同位置变为下一首,重载播放
+      if (a.pos === s.pos) { // 移除的是当前曲:同位置变为下一首,重载但保持原播放/暂停态
         const pos = Math.min(s.pos, order.length - 1)
-        return { ...s, order, pos, lrc: '', tlyric: '', pureMusic: false, isPlaying: true, playToken: s.playToken + 1 }
+        return { ...s, order, pos, lrc: '', tlyric: '', pureMusic: false, isPlaying: s.isPlaying, playToken: s.playToken + 1 }
       }
       return { ...s, order } // 移除的在当前之后,不影响播放
     }
     case 'enqueueNext': {
       const idx = s.queue.length
       const queue = [...s.queue, a.song]
-      if (s.pos < 0) return { ...s, queue, order: [idx], pos: 0, isPlaying: true, radar: false, lrc: '', tlyric: '', pureMusic: false, playToken: s.playToken + 1 }
-      const order = s.order.slice(0, s.pos + 1).concat([idx], s.order.slice(s.pos + 1))
+      if (s.order.length === 0) return { ...s, queue, order: [idx], pos: 0, isPlaying: true, radar: false, lrc: '', tlyric: '', pureMusic: false, playToken: s.playToken + 1 }
+      const order = s.order.slice(0, s.pos + 1).concat([idx], s.order.slice(s.pos + 1)) // pos=-1 时插到最前
       return { ...s, queue, order }
     }
     case 'enqueue': {
       const idx = s.queue.length
       const queue = [...s.queue, a.song]
-      if (s.pos < 0) return { ...s, queue, order: [idx], pos: 0, isPlaying: true, radar: false, lrc: '', tlyric: '', pureMusic: false, playToken: s.playToken + 1 }
+      if (s.order.length === 0) return { ...s, queue, order: [idx], pos: 0, isPlaying: true, radar: false, lrc: '', tlyric: '', pureMusic: false, playToken: s.playToken + 1 }
       return { ...s, queue, order: [...s.order, idx] }
     }
     default: return s
@@ -106,7 +127,7 @@ export function playerReducer(s: PlayerState, a: Action): PlayerState {
 }
 
 interface PlayerValue extends PlayerState {
-  current: Song | null; currentMs: number; durationMs: number; volume: number
+  current: Song | null; volume: number
   queueSongs: Song[]
   playList: (songs: Song[], start: number) => void
   startRadar: () => void
@@ -119,51 +140,77 @@ interface PlayerValue extends PlayerState {
   quality: string; setQuality: (id: string) => void
 }
 const Ctx = createContext<PlayerValue | null>(null)
+// 播放进度单独一个 context:每秒 4 次的 currentMs 更新只让用到进度的组件(播放页/迷你条)重渲染,
+// 其余 usePlayer 消费方(队列 200 行等)不受牵连。
+const ProgressCtx = createContext<{ currentMs: number; durationMs: number }>({ currentMs: 0, durationMs: 0 })
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const [boot] = useState(() => loadPersisted())
   const [state, dispatch] = useReducer(playerReducer, initialPlayerState, (init) =>
     boot ? { ...init, queue: boot.queue, order: boot.order, pos: boot.pos, shuffle: boot.shuffle, repeat: boot.repeat, radar: boot.radar } : init)
-  const handleEnded = useCallback(() => dispatch({ type: 'next' }), [])
-  const { load, play, pause, seek, setVolume, currentMs, durationMs, volume } = useAudio(handleEnded, boot?.volume ?? 1)
-  const qi = curQueueIndex(state)
-  const current = qi >= 0 ? state.queue[qi] : null
-  const skipRef = useRef(0)
 
-  // 用 ref 读取最新 isPlaying:异步取到播放地址时决定是否立即播放(恢复态默认不播,等用户按播放)
   const isPlayingRef = useRef(state.isPlaying)
   isPlayingRef.current = state.isPlaying
-  const seekRef = useRef(seek)
-  seekRef.current = seek
+  const queueLenRef = useRef(state.queue.length)
+  queueLenRef.current = state.queue.length
+  const skipRef = useRef(0)
+  const loadedOkRef = useRef(true) // 当前曲是否成功拿到可播地址;false 时按播放会自动跳过
+
+  // 跳过播不了的歌:连续失败超过队列长度就停,避免死循环
+  const advanceAfterUnplayable = useCallback(() => {
+    skipRef.current += 1
+    if (skipRef.current < queueLenRef.current) { toast('这首暂时播不了,已跳过'); dispatch({ type: 'next' }) }
+    else { skipRef.current = 0; toast('队列里的歌暂时都放不了'); dispatch({ type: 'stop' }) }
+  }, [])
+
+  const handleEnded = useCallback(() => dispatch({ type: 'ended' }), [])
+  const handleError = useCallback((e: MediaError | null) => {
+    loadedOkRef.current = false
+    if (!isPlayingRef.current) return // 暂停时不打扰;按播放会自动跳过
+    const msg = e?.code === 1 ? '播放被中断' : e?.code === 2 ? '网络错误' : e?.code === 3 ? '解码失败' : e?.code === 4 ? '音源不可用' : '未知错误'
+    toast(`播放出错:${msg},自动跳下一首`) // 先说清是什么错误,再跳
+    advanceAfterUnplayable()
+  }, [advanceAfterUnplayable])
+
+  const { load, play, pause, seek, setVolume, currentMs, durationMs, volume } = useAudio(handleEnded, handleError, boot?.volume ?? 1)
+  const qi = curQueueIndex(state)
+  const current = qi >= 0 ? state.queue[qi] : null
+  const seekRef = useRef(seek); seekRef.current = seek
+  const setVolRef = useRef(setVolume); setVolRef.current = setVolume
+  const seekStable = useCallback((ms: number) => seekRef.current(ms), [])
+  const setVolumeStable = useCallback((v: number) => setVolRef.current(v), [])
 
   // 持久化:队列/顺序/位置/设置/音量变化时写入(不含播放进度)
   useEffect(() => {
     savePersisted({ queue: state.queue, order: state.order, pos: state.pos, shuffle: state.shuffle, repeat: state.repeat, radar: state.radar, volume })
   }, [state.queue, state.order, state.pos, state.shuffle, state.repeat, state.radar, volume])
 
+  // 取播放地址(关键)与歌词(尽力而为,失败不连累播放)
   useEffect(() => {
     if (!current) return
     let cancelled = false
-    const advanceAfterUnplayable = () => {
-      skipRef.current += 1
-      if (skipRef.current < state.queue.length) { toast('这首暂时播不了,已跳过'); dispatch({ type: 'next' }) }
-      else { skipRef.current = 0; toast('队列里的歌暂时都放不了'); dispatch({ type: 'stop' }) }
-    }
     ;(async () => {
+      let song: { id: number; url: string | null }
       try {
-        const [song, lyric] = await Promise.all([getSongUrl(current.id, loadQuality()), getLyric(current.id)])
-        if (cancelled) return
-        dispatch({ type: 'setLrc', lrc: lyric.lrc, tlyric: lyric.tlyric, pureMusic: lyric.pureMusic })
-        if (song.url) {
-          skipRef.current = 0
-          load(song.url)
-          if (isPlayingRef.current) { requestWakeLock(); play().catch(() => {}) }
-        } else if (isPlayingRef.current) {
-          advanceAfterUnplayable()
-        }
+        song = await getSongUrl(current.id, loadQuality())
       } catch {
         if (!cancelled && isPlayingRef.current) advanceAfterUnplayable()
+        return
       }
+      if (cancelled) return
+      if (song.url) {
+        loadedOkRef.current = true
+        skipRef.current = 0
+        load(song.url)
+        if (isPlayingRef.current) { requestWakeLock(); play().catch(() => {}) }
+      } else {
+        loadedOkRef.current = false
+        if (isPlayingRef.current) advanceAfterUnplayable()
+      }
+      // 歌词单独取:超时/失败只是没歌词,不该把能播的歌当成播不了跳掉
+      getLyric(current.id)
+        .then((lyric) => { if (!cancelled) dispatch({ type: 'setLrc', lrc: lyric.lrc, tlyric: lyric.tlyric, pureMusic: lyric.pureMusic }) })
+        .catch(() => { if (!cancelled) dispatch({ type: 'setLrc', lrc: '', tlyric: '', pureMusic: false }) })
     })()
     return () => { cancelled = true }
   }, [state.playToken]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -171,7 +218,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const firstRun = useRef(true)
   useEffect(() => {
     if (firstRun.current) { firstRun.current = false; return }
-    state.isPlaying ? play().catch(() => {}) : pause()
+    if (state.isPlaying) {
+      if (loadedOkRef.current) play().catch(() => {})
+      else advanceAfterUnplayable() // 按播放时当前曲不可用(如恢复态遇到下架歌)→ 跳到能播的
+    } else pause()
   }, [state.isPlaying]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 私人FM:接近队尾时预取下一批,形成无限流
@@ -237,9 +287,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   // 音质:持久化选择,切换后重载当前曲以新音质取地址
   const [quality, setQualityState] = useState(loadQuality())
-  const setQuality = (id: string) => { setQualityState(id); saveQuality(id); dispatch({ type: 'reload' }) }
+  const setQuality = useCallback((id: string) => { setQualityState(id); saveQuality(id); dispatch({ type: 'reload' }) }, [])
 
-  // 红心(“我喜欢的音乐”):加载红心列表,提供 isLiked / toggleLike(乐观更新+失败回滚)
+  // 红心(“我喜欢的音乐”):加载红心列表,提供 isLiked / toggleLike(乐观更新+失败回滚并提示)
   const [likedIds, setLikedIds] = useState<Set<number>>(new Set())
   useEffect(() => {
     getLoginStatus()
@@ -247,19 +297,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       .then((ids) => setLikedIds(new Set(ids)))
       .catch(() => {})
   }, [])
-  const isLiked = (id: number) => likedIds.has(id)
-  const toggleLike = (id: number) => {
+  const isLiked = useCallback((id: number) => likedIds.has(id), [likedIds])
+  const toggleLike = useCallback((id: number) => {
     const like = !likedIds.has(id)
     setLikedIds((prev) => { const n = new Set(prev); if (like) n.add(id); else n.delete(id); return n })
     setLike(id, like).catch(() => {
       setLikedIds((prev) => { const n = new Set(prev); if (like) n.delete(id); else n.add(id); return n })
+      toast('红心操作失败,请稍后再试')
     })
-  }
+  }, [likedIds])
 
-  const queueSongs = state.order.map((i) => state.queue[i])
-
-  const value: PlayerValue = {
-    ...state, current, currentMs, durationMs, volume, queueSongs, quality, setQuality,
+  const queueSongs = useMemo(() => state.order.map((i) => state.queue[i]), [state.order, state.queue])
+  const progress = useMemo(() => ({ currentMs, durationMs }), [currentMs, durationMs])
+  // value 不含 currentMs/durationMs,依赖项在进度 tick 时都不变 → 引用稳定,usePlayer 消费方不会每秒重渲染 4 次
+  const value = useMemo<PlayerValue>(() => ({
+    ...state, current, volume, queueSongs, quality, setQuality,
     isLiked, toggleLike,
     jumpTo: (pos) => dispatch({ type: 'jumpTo', pos }),
     removeAt: (pos) => dispatch({ type: 'removeAt', pos }),
@@ -270,15 +322,24 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     toggle: () => dispatch({ type: 'toggle' }),
     next: () => dispatch({ type: 'next' }),
     prev: () => dispatch({ type: 'prev' }),
-    seek, setVolume,
+    seek: seekStable, setVolume: setVolumeStable,
     setShuffle: (on) => dispatch({ type: 'setShuffle', on }),
     cycleRepeat: () => dispatch({ type: 'cycleRepeat' }),
-  }
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+  }), [state, current, volume, queueSongs, quality, setQuality, isLiked, toggleLike, seekStable, setVolumeStable])
+
+  return (
+    <Ctx.Provider value={value}>
+      <ProgressCtx.Provider value={progress}>{children}</ProgressCtx.Provider>
+    </Ctx.Provider>
+  )
 }
 
 export function usePlayer(): PlayerValue {
   const v = useContext(Ctx)
   if (!v) throw new Error('usePlayer must be used within PlayerProvider')
   return v
+}
+
+export function usePlayerProgress() {
+  return useContext(ProgressCtx)
 }

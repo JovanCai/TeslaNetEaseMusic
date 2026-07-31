@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { usePlayer } from './PlayerContext'
+import { usePlayer, usePlayerProgress } from './PlayerContext'
 import { parseLrc, getCurrentLineIndex } from '../lyrics/parseLrc'
 import { LyricsView } from '../lyrics/LyricsView'
 import { QueueView } from './QueueView'
@@ -18,8 +18,10 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
   onOpenArtist: (artistId: number) => void
 }) {
   const p = usePlayer()
+  const { currentMs, durationMs } = usePlayerProgress()
   const npRef = useRef<HTMLDivElement>(null)
   const flipFirst = useRef<Map<string, DOMRect> | null>(null)
+  const flipTimer = useRef<number>(0)
   // 歌词字号 = 随歌词区宽度自动缩放(区域越大字越大)× 用户手动 +/- 的倍数(记忆到本地)
   const lyricsElRef = useRef<HTMLDivElement | null>(null)
   const roRef = useRef<ResizeObserver | null>(null)
@@ -86,6 +88,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
   const swipeStart = useRef<{ x: number; y: number } | null>(null)
   const swipedRef = useRef(false)
   function onNpPointerDown(e: React.PointerEvent) {
+    swipedRef.current = false // 每次新交互开始就复位:触屏划动后不产生点击,否则标志会残留吞掉下一次点击
     const t = e.target as HTMLElement
     // 排除按钮/滑块/分隔条/操作排,避免与点击、拖动进度/音量/分隔条冲突
     if (t.closest('button, input, .np-divider, .np-actions')) { swipeStart.current = null; return }
@@ -102,7 +105,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
     }
   }
   function onNpClickCapture(e: React.MouseEvent) {
-    // 划动后抑制随之而来的点击(避免误触歌词跳转)
+    // 划动后抑制紧随的点击(桌面端划动会补发一次 click),避免误触歌词跳转
     if (swipedRef.current) { e.stopPropagation(); e.preventDefault(); swipedRef.current = false }
   }
   function toggleTrans() {
@@ -128,6 +131,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
     const root = npRef.current
     if (!first || !root) return
     flipFirst.current = null
+    if (flipTimer.current) window.clearTimeout(flipTimer.current) // 取消上一次动画的清理,避免它在本次动画中途剥掉 transition/transform 导致 snap
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return // 晕动敏感:直接切,不做飞行动画
     const els = Array.from(root.querySelectorAll<HTMLElement>('[data-flip]'))
     els.forEach((el) => {
@@ -148,7 +152,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
         el.style.transform = ''
       })
       const clear = () => els.forEach((el) => { el.style.transition = ''; el.style.transformOrigin = ''; el.style.willChange = '' })
-      window.setTimeout(clear, 560)
+      flipTimer.current = window.setTimeout(clear, 560)
     })
   }, [layout])
 
@@ -159,7 +163,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
     const map = new Map(trans.map((t) => [t.timeMs, t.text]))
     return main.map((l) => ({ ...l, trans: map.get(l.timeMs) }))
   }, [p.lrc, p.tlyric])
-  const active = getCurrentLineIndex(lines, p.currentMs)
+  const active = getCurrentLineIndex(lines, currentMs)
   const hasTrans = lines.some((l) => 'trans' in l && (l as { trans?: string }).trans)
   const displayLines = showTrans ? lines : lines.map((l) => ({ timeMs: l.timeMs, text: l.text }))
 
@@ -212,10 +216,10 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
 
       <div className="np-bottom" data-flip="bottom">
         <div className="np-progress">
-          <span className="np-time">{fmt(p.currentMs)}</span>
-          <input className="np-seek" type="range" min={0} max={Math.max(p.durationMs, 1)}
-            value={Math.min(p.currentMs, p.durationMs)} onChange={(e) => p.seek(Number(e.target.value))} />
-          <span className="np-time">{fmt(p.durationMs)}</span>
+          <span className="np-time">{fmt(currentMs)}</span>
+          <input className="np-seek" type="range" min={0} max={Math.max(durationMs, 1)}
+            value={Math.min(currentMs, durationMs)} onChange={(e) => p.seek(Number(e.target.value))} />
+          <span className="np-time">{fmt(durationMs)}</span>
         </div>
         <div className="np-ctl">
           <button className={`tap iconbtn ${p.shuffle ? 'on' : ''}`} onClick={() => p.setShuffle(!p.shuffle)} aria-label="随机"><Icon name="shuffle" size={22} /></button>
