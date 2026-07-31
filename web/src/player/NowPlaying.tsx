@@ -235,8 +235,8 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
 
       {open && lines.length > 0 && (
         <div className="np-fontsize">
-          <button className="tap iconbtn" onClick={() => changeLyricScale(-0.1)} disabled={lyricScale <= 0.6} aria-label="歌词字号减小">A−</button>
-          <button className="tap iconbtn" onClick={() => changeLyricScale(0.1)} disabled={lyricScale >= 1.8} aria-label="歌词字号增大">A+</button>
+          <button className="tap iconbtn" onClick={() => changeLyricScale(-0.1)} disabled={lyricScale <= 0.6} aria-label="歌词字号减小">字－</button>
+          <button className="tap iconbtn" onClick={() => changeLyricScale(0.1)} disabled={lyricScale >= 1.8} aria-label="歌词字号增大">字＋</button>
         </div>
       )}
 
