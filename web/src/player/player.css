@@ -10,6 +10,7 @@
 /* ---- 迷你播放条 ---- */
 .mini { position:fixed; left:12px; right:12px; bottom:96px; display:flex; align-items:center; gap:8px;
   padding:8px 10px; z-index:20; overflow:hidden; }
+.mini-buffer { position:absolute; left:0; top:0; height:2px; background:rgba(var(--accent-rgb),.28); transition:width .3s ease; } /* 浅色缓冲进度 */
 .mini-bar { position:absolute; left:0; top:0; height:2px; background:linear-gradient(90deg,var(--accent),var(--accent-2));
   box-shadow:0 0 8px rgba(var(--accent-rgb),.7); transition:width .25s linear; }
 .mini-info { flex:1; gap:12px; justify-content:flex-start; min-width:0; }
@@ -121,8 +122,8 @@
 .lyrics { text-align:center; padding:34vh 24px; display:flex; flex-direction:column; gap:14px; }
 .line { font-size:var(--lyric-font,1.4rem); line-height:1.5; color:var(--text-2); opacity:.55; cursor:pointer; overflow-wrap:anywhere;
   transition: opacity .35s ease, color .35s ease, transform .35s ease, text-shadow .35s ease; transform:scale(.96); }
-.line.active { opacity:1; color:var(--text-strong); font-weight:700; transform:scale(1.06);
-  text-shadow:0 0 18px rgba(var(--accent-rgb),.65); }
+.line.active { opacity:1; color:var(--text-strong); font-weight:700; transform:scale(1.14);
+  text-shadow:0 0 18px rgba(var(--accent-rgb),.65); } /* 正在唱的行比其它行明显大一点 */
 .line-trans { display:block; font-size:.82em; font-weight:400; color:var(--text-2); margin-top:3px; }
 .line.active .line-trans { color:var(--text); }
 .np-nolyric { display:flex; align-items:center; justify-content:center; height:100%;
@@ -131,7 +132,17 @@
 /* ---- 进度条 + 控制 ---- */
 .np-progress { display:flex; align-items:center; gap:12px; width:min(760px,94%); padding:6px 0; }
 .np-time { color:var(--text-2); font-variant-numeric:tabular-nums; font-size:.85rem; min-width:42px; text-align:center; }
-.np-seek { flex:1; height:6px; accent-color:var(--accent); }
+/* 进度条:底轨 / 浅色缓冲(已加载多少)/ 已播 三层叠加,透明原生滑块只留可拖的圆点 */
+.np-seek-wrap { position:relative; flex:1; height:16px; display:flex; align-items:center; }
+.np-seek-base, .np-seek-buffered, .np-seek-played { position:absolute; left:0; top:50%; height:6px; border-radius:3px; transform:translateY(-50%); pointer-events:none; }
+.np-seek-base { width:100%; background:rgba(var(--accent-rgb),.12); }
+.np-seek-buffered { background:rgba(var(--accent-rgb),.30); transition:width .3s ease; }
+.np-seek-played { background:linear-gradient(90deg,var(--accent),var(--accent-2)); box-shadow:0 0 8px rgba(var(--accent-rgb),.4); }
+.np-seek { position:absolute; left:0; top:0; width:100%; height:16px; margin:0; -webkit-appearance:none; appearance:none; background:transparent; }
+.np-seek::-webkit-slider-runnable-track { height:16px; background:transparent; }
+.np-seek::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 0 8px rgba(var(--accent-rgb),.7); cursor:pointer; }
+.np-seek::-moz-range-track { height:16px; background:transparent; }
+.np-seek::-moz-range-thumb { width:16px; height:16px; border:0; border-radius:50%; background:#fff; box-shadow:0 0 8px rgba(var(--accent-rgb),.7); cursor:pointer; }
 .np-ctl { display:flex; align-items:center; gap:10px; padding:14px 0 6px; }
 .np-ctl .play-btn { width:84px; height:84px; border-radius:50%; color:var(--on-accent);
   background:linear-gradient(135deg,var(--accent),var(--accent-2)); box-shadow:0 0 34px rgba(var(--accent-rgb),.45); }

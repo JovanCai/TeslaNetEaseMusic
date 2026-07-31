@@ -18,7 +18,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
   onOpenArtist: (artistId: number) => void
 }) {
   const p = usePlayer()
-  const { currentMs, durationMs } = usePlayerProgress()
+  const { currentMs, durationMs, bufferedMs } = usePlayerProgress()
   const npRef = useRef<HTMLDivElement>(null)
   const flipFirst = useRef<Map<string, DOMRect> | null>(null)
   const flipTimer = useRef<number>(0)
@@ -217,8 +217,13 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
       <div className="np-bottom" data-flip="bottom">
         <div className="np-progress">
           <span className="np-time">{fmt(currentMs)}</span>
-          <input className="np-seek" type="range" min={0} max={Math.max(durationMs, 1)}
-            value={Math.min(currentMs, durationMs)} onChange={(e) => p.seek(Number(e.target.value))} />
+          <div className="np-seek-wrap">
+            <div className="np-seek-base" />
+            <div className="np-seek-buffered" style={{ width: `${durationMs > 0 ? Math.min(100, (bufferedMs / durationMs) * 100) : 0}%` }} />
+            <div className="np-seek-played" style={{ width: `${durationMs > 0 ? Math.min(100, (currentMs / durationMs) * 100) : 0}%` }} />
+            <input className="np-seek" type="range" min={0} max={Math.max(durationMs, 1)}
+              value={Math.min(currentMs, durationMs)} onChange={(e) => p.seek(Number(e.target.value))} />
+          </div>
           <span className="np-time">{fmt(durationMs)}</span>
         </div>
         <div className="np-ctl">
