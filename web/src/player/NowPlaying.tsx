@@ -20,18 +20,36 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
   const p = usePlayer()
   const npRef = useRef<HTMLDivElement>(null)
   const flipFirst = useRef<Map<string, DOMRect> | null>(null)
-  // 歌词字号随歌词区宽度缩放:区域越大字越大。用回调 ref,在歌词 div 挂载时精确接上 ResizeObserver
+  // 歌词字号 = 随歌词区宽度自动缩放(区域越大字越大)× 用户手动 +/- 的倍数(记忆到本地)
+  const lyricsElRef = useRef<HTMLDivElement | null>(null)
   const roRef = useRef<ResizeObserver | null>(null)
+  const [lyricScale, setLyricScale] = useState(() => {
+    try { const v = Number(localStorage.getItem('tm.lyricscale')); return v >= 0.6 && v <= 1.8 ? v : 1 } catch { return 1 }
+  })
+  const lyricScaleRef = useRef(lyricScale)
+  lyricScaleRef.current = lyricScale
+  const applyLyricFont = useCallback(() => {
+    const el = lyricsElRef.current
+    if (!el) return
+    const base = Math.max(20, Math.min(32, el.clientWidth * 0.03)) // 随宽度自动
+    el.style.setProperty('--lyric-font', `${Math.max(14, Math.min(56, base * lyricScaleRef.current))}px`)
+  }, [])
   const lyricsRef = useCallback((el: HTMLDivElement | null) => {
     roRef.current?.disconnect()
+    lyricsElRef.current = el
     if (el && typeof ResizeObserver !== 'undefined') {
-      const ro = new ResizeObserver(() => {
-        el.style.setProperty('--lyric-font', `${Math.max(20, Math.min(32, el.clientWidth * 0.03))}px`)
-      })
+      const ro = new ResizeObserver(() => applyLyricFont())
       ro.observe(el)
       roRef.current = ro
     }
-  }, [])
+  }, [applyLyricFont])
+  function changeLyricScale(delta: number) {
+    const v = Math.max(0.6, Math.min(1.8, Math.round((lyricScaleRef.current + delta) * 10) / 10))
+    lyricScaleRef.current = v
+    setLyricScale(v)
+    try { localStorage.setItem('tm.lyricscale', String(v)) } catch { /* 忽略 */ }
+    applyLyricFont()
+  }
   const [showQueue, setShowQueue] = useState(false)
   const [showTrans, setShowTrans] = useState(() => {
     try { return localStorage.getItem('tm.showtrans') !== '0' } catch { return true }
@@ -166,7 +184,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
         </div>
       )}
       <div className="np-top" data-flip="top">
-        {cur.cover && <img className="np-cover" src={cur.cover} alt="" />}
+        {cur.cover && <img key={cur.id} className="np-cover" src={cur.cover} alt="" />}
         <div className="np-title">{cur.name}</div>
         <div className="np-artist">{cur.artist}</div>
         <div className="np-actions">
@@ -181,11 +199,15 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
       </div>
 
       <div ref={lyricsRef} className="np-lyrics" data-flip="lyrics">
-        {open && (p.pureMusic
-          ? <div className="np-nolyric">纯音乐 · 请欣赏</div>
-          : lines.length === 0
-            ? <div className="np-nolyric">暂无歌词</div>
-            : <LyricsView lines={displayLines} activeIndex={active} onSeek={(ms) => p.seek(ms)} />)}
+        {open && (
+          <div className="np-lyric-fade" key={cur.id}>
+            {p.pureMusic
+              ? <div className="np-nolyric">纯音乐 · 请欣赏</div>
+              : lines.length === 0
+                ? <div className="np-nolyric">暂无歌词</div>
+                : <LyricsView lines={displayLines} activeIndex={active} onSeek={(ms) => p.seek(ms)} />}
+          </div>
+        )}
       </div>
 
       <div className="np-bottom" data-flip="bottom">
@@ -210,6 +232,13 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
         <QualityPicker />
         <button className="tap np-collapse" onClick={onClose} aria-label="收起"><Icon name="chevronDown" size={22} /> 收起</button>
       </div>
+
+      {open && lines.length > 0 && (
+        <div className="np-fontsize">
+          <button className="tap iconbtn" onClick={() => changeLyricScale(-0.1)} disabled={lyricScale <= 0.6} aria-label="歌词字号减小">A−</button>
+          <button className="tap iconbtn" onClick={() => changeLyricScale(0.1)} disabled={lyricScale >= 1.8} aria-label="歌词字号增大">A+</button>
+        </div>
+      )}
 
       {showQueue && <QueueView onClose={() => setShowQueue(false)} />}
     </div>

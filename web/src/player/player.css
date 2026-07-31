@@ -47,9 +47,9 @@
 .np-divider { position:absolute; top:0; bottom:0; left:calc(20px + var(--splitw,440px)); width:36px; margin-left:-2px;
   z-index:4; display:flex; align-items:center; justify-content:center; cursor:col-resize; touch-action:none; }
 .np-handle { display:flex; align-items:center; justify-content:center; width:30px; height:54px; border-radius:15px;
-  background:var(--surface); border:1px solid var(--border); color:var(--text-2);
-  box-shadow:0 2px 10px rgba(0,0,0,.35); transition:color .2s ease, border-color .2s ease, box-shadow .2s ease; }
-.np-divider:hover .np-handle, .np-divider:active .np-handle { color:var(--accent);
+  background:var(--surface); border:1px solid var(--border); color:var(--text-2); opacity:.4;
+  box-shadow:0 2px 10px rgba(0,0,0,.35); transition:opacity .2s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.np-divider:hover .np-handle, .np-divider:active .np-handle { opacity:1; color:var(--accent);
   border-color:rgba(var(--accent-rgb),.7); box-shadow:0 0 14px rgba(var(--accent-rgb),.5); }
 
 /* 上/下两块:FLIP 动画时由 JS 施加 transform 从旧位置飞到新位置。
@@ -61,6 +61,15 @@
 /* 5 个操作键始终一行:即使左栏拖到最窄(340)也不换行,缩小键宽与间距容纳 */
 .np.split .np-actions { flex-wrap:nowrap; justify-content:center; gap:6px; }
 .np.split .np-actions .iconbtn { min-width:58px; }
+
+/* 歌词字号 +/-:右下角,半透明不抢眼 */
+.np-fontsize { position:absolute; right:16px; bottom:14px; z-index:3; display:flex; gap:6px; }
+.np-fontsize .iconbtn { min-width:50px; height:50px; border:1px solid var(--border); border-radius:14px;
+  background:var(--glass); color:var(--text-2); font-size:1.05rem; font-weight:700; opacity:.5;
+  transition:opacity .2s ease, color .2s ease; }
+.np-fontsize .iconbtn:hover { opacity:.9; }
+.np-fontsize .iconbtn:active { opacity:1; color:var(--accent); }
+.np-fontsize .iconbtn:disabled { opacity:.2; }
 
 /* 分栏切换:独立到左上角(右上角留给主题按钮),不再混进会换行的操作排(“译”异步出现就不会再挤乱左栏) */
 .np-layout-toggle { position:absolute; top:16px; left:16px; z-index:3;
@@ -87,7 +96,11 @@
   .np.ctl-sm .np-ctl .iconbtn[aria-label="下一首"] svg { width:22px; height:22px; }
 }
 .np-cover { width:132px; height:132px; border-radius:20px; margin:0 0 12px; object-fit:cover;
-  box-shadow:0 12px 40px rgba(0,0,0,.5), 0 0 0 1px var(--border); }
+  box-shadow:0 12px 40px rgba(0,0,0,.5), 0 0 0 1px var(--border); animation:npFadeUp .45s ease; }
+/* 切歌时封面 / 歌词丝滑淡入(靠 key=歌曲id 重挂载触发) */
+.np-lyric-fade { min-height:100%; animation:npFade .5s ease; }
+@keyframes npFadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+@keyframes npFade { from { opacity:0; } to { opacity:1; } }
 .np-collapse { margin-top:8px; padding:0 28px; height:56px; min-height:56px; gap:8px;
   border:1px solid var(--border); border-radius:28px; background:var(--surface); color:var(--text-2);
   will-change:transform;
