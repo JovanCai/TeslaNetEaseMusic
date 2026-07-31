@@ -19,7 +19,7 @@ A self-hosted online player for Tesla owners who cannot access NetEase Cloud Mus
 - Playback controls: play/pause, previous/next, shuffle, repeat, seek, volume
 - Karaoke-style scrolling lyrics with translation; instrumentals show a placeholder
 - Two now-playing layouts (centered / split); the split view has a draggable divider to resize the lyrics area, and the lyric font scales with its width
-- Driving-friendly: swipe to change track (left→right next, right→left previous), enlarged controls and mini-player buttons
+- Driving-friendly: swipe to change track (swipe left for next, right for previous), enlarged controls and mini-player buttons
 - Themes: five color schemes, plus an "auto" mode that switches light/dark by your real sunrise and sunset
 - Album and artist pages, play queue, likes
 - Remembers the last queue, position, volume, and settings

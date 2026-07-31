@@ -64,7 +64,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
     document.addEventListener('pointerup', up)
   }
 
-  // 手势切歌:在非交互区域横向划动。左→右(dx>0)下一首,右→左上一首。
+  // 手势切歌:在非交互区域横向划动。左滑(右→左,dx<0)下一首,右滑(左→右,dx>0)上一首(与常见 App 一致)。
   const swipeStart = useRef<{ x: number; y: number } | null>(null)
   const swipedRef = useRef(false)
   function onNpPointerDown(e: React.PointerEvent) {
@@ -80,7 +80,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
     const dx = e.clientX - s.x, dy = e.clientY - s.y
     if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.4) { // 横向为主的明显划动
       swipedRef.current = true
-      if (dx > 0) p.next(); else p.prev()
+      if (dx > 0) p.prev(); else p.next()
     }
   }
   function onNpClickCapture(e: React.MouseEvent) {
