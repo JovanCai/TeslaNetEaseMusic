@@ -9,7 +9,12 @@ export const THEMES = [
 const KEY = 'tm.theme'
 const DARK_KEY = 'tm.darktheme'
 const SUN_KEY = 'tm.suntimes'
-export const AUTO = 'auto'
+export const AUTO = 'auto'          // 跟随日出日落(计算)
+export const AUTO_SYS = 'auto-sys'  // 跟随车机/系统深色(prefers-color-scheme,与车机日夜同时切)
+
+function systemPrefersDark(): boolean {
+  return typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+}
 
 // 取不到日出日落时的回退窗口(本地时间)。改这里要同步 index.html 的启动脚本。
 const FALLBACK_DAY_START = 6
@@ -60,8 +65,9 @@ function loadDarkTheme(): string {
 
 // 把偏好解析成实际应用的主题 id
 export function resolveTheme(pref = loadThemePref()): string {
-  if (pref !== AUTO) return pref
-  return isDaytime() ? 'daylight' : loadDarkTheme()
+  if (pref === AUTO) return isDaytime() ? 'daylight' : loadDarkTheme()
+  if (pref === AUTO_SYS) return systemPrefersDark() ? loadDarkTheme() : 'daylight'
+  return pref
 }
 
 // 写入 <html data-theme>(仅应用,不改用户偏好)
@@ -73,7 +79,7 @@ export function applyResolvedTheme(): void {
 export function setThemePref(pref: string): void {
   try {
     localStorage.setItem(KEY, pref)
-    if (pref !== AUTO && pref !== 'daylight') localStorage.setItem(DARK_KEY, pref)
+    if (pref !== AUTO && pref !== AUTO_SYS && pref !== 'daylight') localStorage.setItem(DARK_KEY, pref)
   } catch { /* 忽略 */ }
   applyResolvedTheme()
 }

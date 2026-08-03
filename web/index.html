@@ -11,7 +11,11 @@
       try {
         var pref = localStorage.getItem('tm.theme') || 'neon';
         var t = pref;
-        if (pref === 'auto') {
+        var dark = localStorage.getItem('tm.darktheme') || 'neon';
+        if (pref === 'auto-sys') { // 跟随车机/系统深色
+          var sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          t = sysDark ? dark : 'daylight';
+        } else if (pref === 'auto') { // 跟随日出日落
           var n = new Date();
           var ld = n.getFullYear() + '-' + (n.getMonth() + 1) + '-' + n.getDate();
           var isDay;
@@ -20,7 +24,7 @@
             if (st && st.d === ld) isDay = (Date.now() >= st.rise && Date.now() < st.set);
           } catch (e) {}
           if (isDay === undefined) { var h = n.getHours(); isDay = (h >= 6 && h < 18); }
-          t = isDay ? 'daylight' : (localStorage.getItem('tm.darktheme') || 'neon');
+          t = isDay ? 'daylight' : dark;
         }
         document.documentElement.dataset.theme = t;
       } catch (e) {}
