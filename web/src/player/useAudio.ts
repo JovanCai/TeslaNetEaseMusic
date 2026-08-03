@@ -1,37 +1,63 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export function useAudio(onEnded?: () => void, onError?: (e: MediaError | null) => void, initialVolume = 1) {
-  const [audio] = useState(() => { const a = new Audio(); a.volume = initialVolume; return a })
   const [currentMs, setCurrentMs] = useState(0)
   const [durationMs, setDurationMs] = useState(0)
-  const [bufferedMs, setBufferedMs] = useState(0) // 已缓冲到的位置(用于播放条上的浅色加载进度)
+  const [bufferedMs, setBufferedMs] = useState(0) // 已缓冲到的位置(播放条上的浅色加载进度)
   const [volume, setVolumeState] = useState(initialVolume)
+  const cb = useRef({ onEnded, onError })
+  cb.current = { onEnded, onError }
+
+  // 两个元素乒乓:一个在播,另一个预载下一首。切歌时交换,直接用已缓冲的字节,不重新下载。
+  const [pair] = useState<[HTMLAudioElement, HTMLAudioElement]>(() => {
+    const a = new Audio(), b = new Audio()
+    a.volume = b.volume = initialVolume
+    return [a, b]
+  })
+  const activeIdxRef = useRef(0)
+  const spareUrlRef = useRef('') // 备用元素当前预载的地址
+  const [activeIdx, setActiveIdx] = useState(0) // 变化时把监听器重绑到新的活动元素
+  const cur = () => pair[activeIdxRef.current]
+  const spare = () => pair[1 - activeIdxRef.current]
 
   useEffect(() => {
-    const readBuffered = () => setBufferedMs(audio.buffered.length ? audio.buffered.end(audio.buffered.length - 1) * 1000 : 0)
-    const onTime = () => { setCurrentMs(audio.currentTime * 1000); readBuffered() }
-    const onMeta = () => setDurationMs((audio.duration || 0) * 1000)
+    const a = pair[activeIdx]
+    const readBuffered = () => setBufferedMs(a.buffered.length ? a.buffered.end(a.buffered.length - 1) * 1000 : 0)
+    const onTime = () => { setCurrentMs(a.currentTime * 1000); readBuffered() }
+    const onMeta = () => setDurationMs((a.duration || 0) * 1000)
     const onProgress = () => readBuffered()
-    const onEnd = () => onEnded?.()
-    const onErr = () => onError?.(audio.error) // 播放/解码/网络失败:交给上层弹提示并跳过
-    audio.addEventListener('timeupdate', onTime)
-    audio.addEventListener('loadedmetadata', onMeta)
-    audio.addEventListener('progress', onProgress)
-    audio.addEventListener('ended', onEnd)
-    audio.addEventListener('error', onErr)
+    const onEnd = () => cb.current.onEnded?.()
+    const onErr = () => cb.current.onError?.(a.error) // 播放/解码/网络失败:交给上层弹提示并跳过
+    a.addEventListener('timeupdate', onTime)
+    a.addEventListener('loadedmetadata', onMeta)
+    a.addEventListener('progress', onProgress)
+    a.addEventListener('ended', onEnd)
+    a.addEventListener('error', onErr)
+    setCurrentMs(a.currentTime * 1000); setDurationMs((a.duration || 0) * 1000); readBuffered() // 交换后立即同步进度
     return () => {
-      audio.removeEventListener('timeupdate', onTime)
-      audio.removeEventListener('loadedmetadata', onMeta)
-      audio.removeEventListener('progress', onProgress)
-      audio.removeEventListener('ended', onEnd)
-      audio.removeEventListener('error', onErr)
+      a.removeEventListener('timeupdate', onTime)
+      a.removeEventListener('loadedmetadata', onMeta)
+      a.removeEventListener('progress', onProgress)
+      a.removeEventListener('ended', onEnd)
+      a.removeEventListener('error', onErr)
     }
-  }, [audio, onEnded, onError])
+  }, [pair, activeIdx])
 
-  function load(url: string) { if (audio.src !== url) { audio.src = url; setBufferedMs(0); setCurrentMs(0) } }
-  function play() { return audio.play() }        // 播放当前 src
-  function pause() { audio.pause() }
-  function seek(ms: number) { audio.currentTime = ms / 1000 }
-  function setVolume(v: number) { audio.volume = v; setVolumeState(v) }
-  return { load, play, pause, seek, setVolume, currentMs, durationMs, bufferedMs, volume }
+  function load(url: string) { const a = cur(); if (a.src !== url) { a.src = url; setBufferedMs(0); setCurrentMs(0) } }
+  function play() { return cur().play() }
+  function pause() { cur().pause() }
+  function seek(ms: number) { cur().currentTime = ms / 1000 }
+  function setVolume(v: number) { pair.forEach((a) => { a.volume = v }); setVolumeState(v) }
+  function preload(url: string) { const s = spare(); if (spareUrlRef.current !== url) { s.preload = 'auto'; s.src = url; spareUrlRef.current = url } }
+  // 切到已预载的备用元素(已缓冲下一首)。备用地址不匹配则返回 false,让调用方走普通加载。
+  function swapToPreloaded(url: string): boolean {
+    if (spareUrlRef.current !== url) return false
+    pause() // 停掉旧的活动元素
+    activeIdxRef.current = 1 - activeIdxRef.current
+    cur().currentTime = 0
+    spareUrlRef.current = '' // 旧活动元素成为新备用,清掉标记
+    setActiveIdx(activeIdxRef.current)
+    return true
+  }
+  return { load, play, pause, seek, setVolume, preload, swapToPreloaded, currentMs, durationMs, bufferedMs, volume }
 }

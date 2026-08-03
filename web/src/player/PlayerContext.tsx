@@ -155,8 +155,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   queueLenRef.current = state.queue.length
   const skipRef = useRef(0)
   const loadedOkRef = useRef(true) // 当前曲是否成功拿到可播地址;false 时按播放会自动跳过
-  const preloadAudioRef = useRef<HTMLAudioElement | null>(null) // 隐藏元素,提前缓冲下一首的音频字节
-  const preloadedRef = useRef<{ id: number; url: string } | null>(null) // 已预取的下一首播放地址
+  const preloadedRef = useRef<{ id: number; url: string } | null>(null) // 已预取并缓冲的下一首
   const preloadTokenRef = useRef(-1) // 保证每首只预载一次
 
   // 跳过播不了的歌:连续失败超过队列长度就停,避免死循环
@@ -175,7 +174,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     advanceAfterUnplayable()
   }, [advanceAfterUnplayable])
 
-  const { load, play, pause, seek, setVolume, currentMs, durationMs, bufferedMs, volume } = useAudio(handleEnded, handleError, boot?.volume ?? 1)
+  const { load, play, pause, seek, setVolume, preload, swapToPreloaded, currentMs, durationMs, bufferedMs, volume } = useAudio(handleEnded, handleError, boot?.volume ?? 1)
   const qi = curQueueIndex(state)
   const current = qi >= 0 ? state.queue[qi] : null
   const seekRef = useRef(seek); seekRef.current = seek
@@ -193,15 +192,23 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (!current) return
     let cancelled = false
     ;(async () => {
-      let url: string | null = null
+      // 下一首已预载并缓冲在备用元素:直接切过去,复用字节、不重新下载
       const pre = preloadedRef.current
-      if (pre && pre.id === current.id) { url = pre.url; preloadedRef.current = null } // 用预载好的地址,省一次请求(弱网更快)
-      else {
-        try { url = (await getSongUrl(current.id, loadQuality())).url }
-        catch {
-          if (!cancelled && isPlayingRef.current) advanceAfterUnplayable()
-          return
-        }
+      if (pre && pre.id === current.id && swapToPreloaded(pre.url)) {
+        preloadedRef.current = null
+        loadedOkRef.current = true
+        skipRef.current = 0
+        if (isPlayingRef.current) { requestWakeLock(); play().catch(() => {}) }
+        getLyric(current.id)
+          .then((lyric) => { if (!cancelled) dispatch({ type: 'setLrc', lrc: lyric.lrc, tlyric: lyric.tlyric, pureMusic: lyric.pureMusic }) })
+          .catch(() => { if (!cancelled) dispatch({ type: 'setLrc', lrc: '', tlyric: '', pureMusic: false }) })
+        return
+      }
+      let url: string | null = null
+      try { url = (await getSongUrl(current.id, loadQuality())).url }
+      catch {
+        if (!cancelled && isPlayingRef.current) advanceAfterUnplayable()
+        return
       }
       if (cancelled) return
       if (url) {
@@ -242,12 +249,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       .finally(() => { fetchingRef.current = false })
   }, [state.radar, state.pos, state.order.length])
 
-  // 弱网韧性:当前曲过半(或剩 45s)时,预取下一首的播放地址并缓冲音频字节。
-  // 曲终/切歌时直接用预载地址(省一次 API 往返、字节已在缓存),更快更不易卡。单曲循环/无下一首不预载。
+  // 弱网韧性:当前曲播放几秒后,预取下一首地址并用备用元素缓冲字节。切歌/曲终时直接切到备用元素
+  // (复用缓冲、不重新下载),更快更不易卡。单曲循环/无下一首不预载。
   useEffect(() => {
     if (!state.isPlaying || durationMs <= 0) return
     if (preloadTokenRef.current === state.playToken) return // 每首只预载一次
-    if (currentMs < durationMs * 0.5 && durationMs - currentMs > 45000) return // 过半或剩 45s 才开始
+    if (currentMs < 5000) return // 播了几秒(用户大概率会继续听)后再预载,给当前曲的缓冲让路
     preloadTokenRef.current = state.playToken
     const np = nextIndex(state.order.length, state.pos, state.repeat)
     if (np < 0 || np === state.pos) return // 无下一首 / 单曲循环
@@ -256,11 +263,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     getSongUrl(nextSong.id, loadQuality()).then((r) => {
       if (!r.url) return
       preloadedRef.current = { id: nextSong.id, url: r.url }
-      const a = preloadAudioRef.current ?? (preloadAudioRef.current = new Audio())
-      a.preload = 'auto'
-      a.src = r.url // 提前缓冲下一首的字节
+      preload(r.url) // 用备用元素缓冲下一首的字节
     }).catch(() => {})
-  }, [currentMs, durationMs, state.isPlaying, state.playToken, state.pos, state.order, state.queue, state.repeat])
+  }, [currentMs, durationMs, state.isPlaying, state.playToken, state.pos, state.order, state.queue, state.repeat]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Media Session 媒体键:只注册一次,逐个 try/catch —— 某个动作在车机内核不支持而抛错时,
   // 不会中断后面动作的注册(此前 prev/next 就是被中途抛错拖累而未注册、按键变灰)。
