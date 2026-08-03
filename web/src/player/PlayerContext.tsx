@@ -142,7 +142,7 @@ interface PlayerValue extends PlayerState {
 const Ctx = createContext<PlayerValue | null>(null)
 // 播放进度单独一个 context:每秒 4 次的 currentMs 更新只让用到进度的组件(播放页/迷你条)重渲染,
 // 其余 usePlayer 消费方(队列 200 行等)不受牵连。
-const ProgressCtx = createContext<{ currentMs: number; durationMs: number; bufferedMs: number }>({ currentMs: 0, durationMs: 0, bufferedMs: 0 })
+const ProgressCtx = createContext<{ currentMs: number; durationMs: number; bufferedMs: number; stalled: boolean; netInterrupted: boolean }>({ currentMs: 0, durationMs: 0, bufferedMs: 0, stalled: false, netInterrupted: false })
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const [boot] = useState(() => loadPersisted())
@@ -157,6 +157,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const loadedOkRef = useRef(true) // 当前曲是否成功拿到可播地址;false 时按播放会自动跳过
   const preloadedRef = useRef<{ id: number; url: string } | null>(null) // 已预取并缓冲的下一首
   const preloadTokenRef = useRef(-1) // 保证每首只预载一次
+  const playedRef = useRef(0)        // 当前曲已播到的位置(ms)
+  const durationRef = useRef(0)
+  const curUrlRef = useRef('')       // 当前曲已加载的地址(断网续播时重载用)
+  const interruptedRef = useRef<{ url: string; ms: number } | null>(null) // 中途断网:保住的地址+断点
+  const pauseRef = useRef<() => void>(() => {})
+  const [netInterrupted, setNetInterrupted] = useState(false) // UI:网络中断,恢复后自动继续
 
   // 跳过播不了的歌:连续失败超过队列长度就停,避免死循环
   const advanceAfterUnplayable = useCallback(() => {
@@ -165,22 +171,50 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     else { skipRef.current = 0; toast('队列里的歌暂时都放不了'); dispatch({ type: 'stop' }) }
   }, [])
 
-  const handleEnded = useCallback(() => dispatch({ type: 'ended' }), [])
+  // 曲终自动续播;但若远未到真实时长(播到缓冲末尾就"结束"),多半是断网,当作中断而非前进
+  const handleEnded = useCallback(() => {
+    if (durationRef.current > 0 && playedRef.current < durationRef.current - 3000 && curUrlRef.current) {
+      interruptedRef.current = { url: curUrlRef.current, ms: playedRef.current }
+      setNetInterrupted(true)
+      return
+    }
+    dispatch({ type: 'ended' })
+  }, [])
+
   const handleError = useCallback((e: MediaError | null) => {
+    if (interruptedRef.current) return // 已在中断/重连中:继续等,别跳
+    if (playedRef.current > 1500 && curUrlRef.current) { // 本来播得好好的、只是中途断网 → 保住这首,等网络恢复续播
+      interruptedRef.current = { url: curUrlRef.current, ms: playedRef.current }
+      pauseRef.current()
+      setNetInterrupted(true)
+      toast('网络中断,恢复后自动继续')
+      return
+    }
+    // 从没播出来 → 不可用,跳过(带提示)
     loadedOkRef.current = false
-    if (!isPlayingRef.current) return // 暂停时不打扰;按播放会自动跳过
-    const msg = e?.code === 1 ? '播放被中断' : e?.code === 2 ? '网络错误' : e?.code === 3 ? '解码失败' : e?.code === 4 ? '音源不可用' : '未知错误'
-    toast(`播放出错:${msg},自动跳下一首`) // 先说清是什么错误,再跳
+    if (!isPlayingRef.current) return
+    const msg = e?.code === 2 ? '网络错误' : e?.code === 3 ? '解码失败' : e?.code === 4 ? '音源不可用' : '播放出错'
+    toast(`${msg},已跳过`)
     advanceAfterUnplayable()
   }, [advanceAfterUnplayable])
 
-  const { load, play, pause, seek, setVolume, preload, swapToPreloaded, currentMs, durationMs, bufferedMs, volume } = useAudio(handleEnded, handleError, boot?.volume ?? 1)
+  const { load, play, pause, seek, setVolume, preload, swapToPreloaded, reloadFrom, currentMs, durationMs, bufferedMs, stalled, volume } = useAudio(handleEnded, handleError, boot?.volume ?? 1)
   const qi = curQueueIndex(state)
   const current = qi >= 0 ? state.queue[qi] : null
+  playedRef.current = currentMs
+  durationRef.current = durationMs
+  pauseRef.current = pause
   const seekRef = useRef(seek); seekRef.current = seek
   const setVolRef = useRef(setVolume); setVolRef.current = setVolume
+  const reloadFromRef = useRef(reloadFrom); reloadFromRef.current = reloadFrom
   const seekStable = useCallback((ms: number) => seekRef.current(ms), [])
   const setVolumeStable = useCallback((v: number) => setVolRef.current(v), [])
+  // 断网续播:网络恢复(online 事件/定时重试/按播放)时,重载并 seek 回断点续播
+  const attemptResume = useCallback(() => {
+    const it = interruptedRef.current
+    if (!it || !isPlayingRef.current) return
+    reloadFromRef.current(it.url, it.ms)
+  }, [])
 
   // 持久化:队列/顺序/位置/设置/音量变化时写入(不含播放进度)
   useEffect(() => {
@@ -190,12 +224,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // 取播放地址(关键)与歌词(尽力而为,失败不连累播放)
   useEffect(() => {
     if (!current) return
+    interruptedRef.current = null; setNetInterrupted(false); playedRef.current = 0 // 换曲:清掉上一首的断网状态
     let cancelled = false
     ;(async () => {
       // 下一首已预载并缓冲在备用元素:直接切过去,复用字节、不重新下载
       const pre = preloadedRef.current
       if (pre && pre.id === current.id && swapToPreloaded(pre.url)) {
         preloadedRef.current = null
+        curUrlRef.current = pre.url
         loadedOkRef.current = true
         skipRef.current = 0
         if (isPlayingRef.current) { requestWakeLock(); play().catch(() => {}) }
@@ -212,6 +248,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       }
       if (cancelled) return
       if (url) {
+        curUrlRef.current = url
         loadedOkRef.current = true
         skipRef.current = 0
         load(url)
@@ -232,10 +269,27 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (firstRun.current) { firstRun.current = false; return }
     if (state.isPlaying) {
-      if (loadedOkRef.current) play().catch(() => {})
+      if (interruptedRef.current) attemptResume() // 断网中按播放:尝试从断点续播
+      else if (loadedOkRef.current) play().catch(() => {})
       else advanceAfterUnplayable() // 按播放时当前曲不可用(如恢复态遇到下架歌)→ 跳到能播的
     } else pause()
   }, [state.isPlaying]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 网络恢复(online 事件)或中断期间定时,自动尝试续播;播到断点之后就清掉中断态
+  useEffect(() => {
+    const on = () => attemptResume()
+    window.addEventListener('online', on)
+    return () => window.removeEventListener('online', on)
+  }, [attemptResume])
+  useEffect(() => {
+    if (!netInterrupted) return
+    const t = window.setInterval(() => attemptResume(), 6000) // online 事件不可靠时的兜底重试
+    return () => window.clearInterval(t)
+  }, [netInterrupted, attemptResume])
+  useEffect(() => {
+    const it = interruptedRef.current
+    if (it && currentMs > it.ms + 300) { interruptedRef.current = null; setNetInterrupted(false); skipRef.current = 0 } // 已续上
+  }, [currentMs])
 
   // 私人FM:接近队尾时预取下一批,形成无限流
   const fetchingRef = useRef(false)
@@ -339,7 +393,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [likedIds])
 
   const queueSongs = useMemo(() => state.order.map((i) => state.queue[i]), [state.order, state.queue])
-  const progress = useMemo(() => ({ currentMs, durationMs, bufferedMs }), [currentMs, durationMs, bufferedMs])
+  const progress = useMemo(() => ({ currentMs, durationMs, bufferedMs, stalled, netInterrupted }), [currentMs, durationMs, bufferedMs, stalled, netInterrupted])
   // value 不含 currentMs/durationMs,依赖项在进度 tick 时都不变 → 引用稳定,usePlayer 消费方不会每秒重渲染 4 次
   const value = useMemo<PlayerValue>(() => ({
     ...state, current, volume, queueSongs, quality, setQuality,

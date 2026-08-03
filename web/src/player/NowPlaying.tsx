@@ -18,7 +18,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
   onOpenArtist: (artistId: number) => void
 }) {
   const p = usePlayer()
-  const { currentMs, durationMs, bufferedMs } = usePlayerProgress()
+  const { currentMs, durationMs, bufferedMs, stalled, netInterrupted } = usePlayerProgress()
   const npRef = useRef<HTMLDivElement>(null)
   const flipFirst = useRef<Map<string, DOMRect> | null>(null)
   const flipTimer = useRef<number>(0)
@@ -191,6 +191,9 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
         {cur.cover && <img key={cur.id} className="np-cover" src={cur.cover} alt="" />}
         <div className="np-title">{cur.name}</div>
         <div className="np-artist">{cur.artist}</div>
+        {(netInterrupted || stalled) && (
+          <div className={`np-status ${netInterrupted ? 'net' : ''}`}>{netInterrupted ? '网络中断,恢复后自动继续' : '缓冲中…'}</div>
+        )}
         <div className="np-actions">
           <button className={`tap iconbtn ${p.isLiked(cur.id) ? 'liked' : ''}`} onClick={() => p.toggleLike(cur.id)} aria-label="红心">
             <Icon name={p.isLiked(cur.id) ? 'heartFilled' : 'heart'} size={22} />

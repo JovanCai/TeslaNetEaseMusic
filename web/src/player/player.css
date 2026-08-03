@@ -111,6 +111,10 @@
   transition: transform .08s ease-out, background .08s ease-out; }
 .np-title { font-size:1.5rem; font-weight:700; letter-spacing:.5px; text-align:center; }
 .np-artist { color:var(--text-2); margin-top:2px; }
+.np-status { margin-top:8px; font-size:.85rem; color:var(--text-2); display:flex; align-items:center; gap:6px; animation:npFade .3s ease; }
+.np-status::before { content:''; width:7px; height:7px; border-radius:50%; background:currentColor; animation:pulse 1.2s ease-in-out infinite; }
+.np-status.net { color:#ffb454; } /* 网络中断:琥珀色更醒目 */
+@keyframes pulse { 0%,100% { opacity:.35; } 50% { opacity:1; } }
 .np-actions { display:flex; gap:8px; margin-top:6px; }
 .iconbtn.liked { color:#ff4d6d; filter:drop-shadow(0 0 8px rgba(255,77,109,.6)); }
 .trans-btn { font-weight:700; font-size:1.15rem; }

@@ -4,7 +4,7 @@ import './player.css'
 
 export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
   const p = usePlayer()
-  const { currentMs, durationMs, bufferedMs } = usePlayerProgress()
+  const { currentMs, durationMs, bufferedMs, stalled, netInterrupted } = usePlayerProgress()
   if (!p.current) return null
   const cur = p.current
   const progress = durationMs > 0 ? (currentMs / durationMs) * 100 : 0
@@ -17,7 +17,7 @@ export function MiniPlayer({ onExpand }: { onExpand: () => void }) {
         {cur.cover && <img src={cur.cover} alt="" className="mini-cover" />}
         <div className="mini-meta">
           <div className="mini-name">{cur.name}</div>
-          <div className="mini-artist">{cur.artist}</div>
+          <div className="mini-artist" style={netInterrupted ? { color: '#ffb454' } : undefined}>{netInterrupted ? '网络中断,恢复后继续' : stalled ? '缓冲中…' : cur.artist}</div>
         </div>
       </div>
       <button className={`tap iconbtn ${p.isLiked(cur.id) ? 'liked' : ''}`} onClick={() => p.toggleLike(cur.id)} aria-label="红心">
