@@ -1,19 +1,36 @@
 const BASE = '/api'
 
+// 统一请求:加超时(默认 8s,弱网下不会无限转圈)与失败退避重试(默认 2 次)。
+// 关键:闲置后后端到网易的连接会冷掉,第一发常失败;重试能自愈,避免上层把"暂时取不到"误判成"这首播不了"直接跳歌。
+async function fetchJson(path: string, { timeout = 8000, retries = 2 } = {}): Promise<any> {
+  let lastErr: unknown
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), timeout)
+    try {
+      const r = await fetch(`${BASE}${path}`, { signal: ctrl.signal })
+      if (!r.ok) throw new Error(`${path} ${r.status}`)
+      return await r.json()
+    } catch (e) {
+      lastErr = e
+      if (attempt < retries) await new Promise((res) => setTimeout(res, 500 * (attempt + 1))) // 退避 0.5s / 1s
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+  throw lastErr
+}
+
 export async function getSongUrl(id: number, level = 'exhigh'): Promise<{ id: number; url: string | null }> {
   // 区域解锁(realIP)由后端按需自动注入,前端无需传参。
-  const r = await fetch(`${BASE}/song/url/v1?id=${id}&level=${level}`)
-  if (!r.ok) throw new Error(`song/url ${r.status}`)
-  const j: any = await r.json()
+  const j: any = await fetchJson(`/song/url/v1?id=${id}&level=${level}`)
   const raw: string | null = j?.data?.[0]?.url ?? null
   // 网易云常返回 http:// 地址;车机走 https 时 http 音频会被当混合内容拦掉,统一升级为 https。
   return { id, url: raw ? raw.replace(/^http:\/\//, 'https://') : null }
 }
 
 export async function getLyric(id: number): Promise<{ lrc: string; tlyric: string; pureMusic: boolean }> {
-  const r = await fetch(`${BASE}/lyric?id=${id}`)
-  if (!r.ok) throw new Error(`lyric ${r.status}`)
-  const j: any = await r.json()
+  const j: any = await fetchJson(`/lyric?id=${id}`)
   return { lrc: j?.lrc?.lyric ?? '', tlyric: j?.tlyric?.lyric ?? '', pureMusic: !!j?.pureMusic }
 }
 
@@ -29,9 +46,7 @@ function toSong(r: any): Song {
 }
 
 async function getJson(path: string): Promise<any> {
-  const r = await fetch(`${BASE}${path}`)
-  if (!r.ok) throw new Error(`${path} ${r.status}`)
-  return r.json()
+  return fetchJson(path) // 复用超时+重试;所有列表/搜索/歌单请求一并获得弱网韧性
 }
 
 export async function getDailySongs(): Promise<Song[]> {

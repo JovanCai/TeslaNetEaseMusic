@@ -24,6 +24,31 @@ describe('getSongUrl', () => {
   })
 })
 
+describe('弱网韧性:超时 + 退避重试', () => {
+  it('第一发失败,自动重试成功(闲置后冷连接自愈,不误判成播不了)', async () => {
+    const f = vi.fn()
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: [{ url: 'http://x/a.mp3' }] }) })
+    vi.stubGlobal('fetch', f)
+    expect((await getSongUrl(1)).url).toBe('https://x/a.mp3')
+    expect(f).toHaveBeenCalledTimes(2)
+  })
+  it('HTTP 非 2xx(冷启动 502)也重试', async () => {
+    const f = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 502 })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ data: [{ url: 'https://y/b.mp3' }] }) })
+    vi.stubGlobal('fetch', f)
+    expect((await getSongUrl(2)).url).toBe('https://y/b.mp3')
+    expect(f).toHaveBeenCalledTimes(2)
+  })
+  it('重试用尽仍失败则抛错(交给上层,不静默吞成 null)', async () => {
+    const f = vi.fn().mockRejectedValue(new Error('down'))
+    vi.stubGlobal('fetch', f)
+    await expect(getSongUrl(1)).rejects.toThrow()
+    expect(f).toHaveBeenCalledTimes(3) // 1 次 + 2 次重试
+  })
+})
+
 describe('getLyric', () => {
   it('解析 lrc 与 tlyric', async () => {
     vi.stubGlobal('fetch', mockFetch({ lrc: { lyric: 'L' }, tlyric: { lyric: 'T' } }))
