@@ -9,11 +9,14 @@ export const THEMES = [
 const KEY = 'tm.theme'
 const DARK_KEY = 'tm.darktheme'
 const SUN_KEY = 'tm.suntimes'
-export const AUTO = 'auto'          // 跟随日出日落(计算)
-export const AUTO_SYS = 'auto-sys'  // 跟随车机/系统深色(prefers-color-scheme,与车机日夜同时切)
+export const AUTO = 'auto' // 自动:先跟车机深浅(prefers-color-scheme,与车机日夜同切),车机不给偏好再回退日出日落
 
-function systemPrefersDark(): boolean {
-  return typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+// 车机/系统的深浅偏好:'dark'|'light';两者都不匹配(不支持/无偏好)返回 null → 交给日出日落兜底
+export function systemScheme(): 'dark' | 'light' | null {
+  if (typeof window === 'undefined' || !window.matchMedia) return null
+  if (window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark'
+  if (window.matchMedia('(prefers-color-scheme: light)').matches) return 'light'
+  return null
 }
 
 // 取不到日出日落时的回退窗口(本地时间)。改这里要同步 index.html 的启动脚本。
@@ -53,9 +56,12 @@ export async function ensureSunTimes(): Promise<void> {
   } catch { /* 网络/CORS 失败:静默回退固定窗口 */ }
 }
 
-// 用户偏好:某个主题 id,或 'auto'
+// 用户偏好:某个主题 id,或 'auto'。旧的 'auto-sys'(跟随车机)已并入统一的 'auto'
 export function loadThemePref(): string {
-  try { return localStorage.getItem(KEY) || 'neon' } catch { return 'neon' }
+  try {
+    const v = localStorage.getItem(KEY) || 'neon'
+    return v === 'auto-sys' ? AUTO : v
+  } catch { return 'neon' }
 }
 
 // 自动模式夜间使用的深色主题(记住用户上次挑的深色)
@@ -63,10 +69,13 @@ function loadDarkTheme(): string {
   try { return localStorage.getItem(DARK_KEY) || 'neon' } catch { return 'neon' }
 }
 
-// 把偏好解析成实际应用的主题 id
+// 把偏好解析成实际应用的主题 id。自动:先看车机深浅,车机不给偏好再用日出日落
 export function resolveTheme(pref = loadThemePref()): string {
-  if (pref === AUTO) return isDaytime() ? 'daylight' : loadDarkTheme()
-  if (pref === AUTO_SYS) return systemPrefersDark() ? loadDarkTheme() : 'daylight'
+  if (pref === AUTO) {
+    const sys = systemScheme()
+    if (sys) return sys === 'dark' ? loadDarkTheme() : 'daylight' // 车机给了偏好:优先跟车机
+    return isDaytime() ? 'daylight' : loadDarkTheme()              // 车机不给:回退日出日落
+  }
   return pref
 }
 
@@ -79,7 +88,7 @@ export function applyResolvedTheme(): void {
 export function setThemePref(pref: string): void {
   try {
     localStorage.setItem(KEY, pref)
-    if (pref !== AUTO && pref !== AUTO_SYS && pref !== 'daylight') localStorage.setItem(DARK_KEY, pref)
+    if (pref !== AUTO && pref !== 'daylight') localStorage.setItem(DARK_KEY, pref)
   } catch { /* 忽略 */ }
   applyResolvedTheme()
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { THEMES, AUTO, AUTO_SYS, loadThemePref, setThemePref, applyResolvedTheme, ensureSunTimes } from '../ui/themes'
+import { THEMES, AUTO, systemScheme, loadThemePref, setThemePref, applyResolvedTheme, ensureSunTimes } from '../ui/themes'
 import { Icon } from './Icon'
 
 export function ThemePicker() {
@@ -12,22 +12,21 @@ export function ThemePicker() {
     return () => document.body.classList.remove('picker-open')
   }, [open])
 
-  // 自动模式:日出日落(定时重算)或跟随车机深色(prefers-color-scheme 变化即时响应)
+  // 自动模式:车机给了深浅偏好就跟车机(日夜变化即时响应、不联网);车机不给再回退日出日落(定时重算)
   useEffect(() => {
     applyResolvedTheme()
-    if (pref === AUTO) {
-      let alive = true
-      const tick = () => { ensureSunTimes().then(() => { if (alive) applyResolvedTheme() }) }
-      tick()
-      const t = window.setInterval(tick, 60_000) // 当日已缓存则直接返回,仅跨日会真正联网
-      return () => { alive = false; window.clearInterval(t) }
-    }
-    if (pref === AUTO_SYS && window.matchMedia) {
+    if (pref !== AUTO) return
+    if (systemScheme() != null && window.matchMedia) {
       const mq = window.matchMedia('(prefers-color-scheme: dark)')
       const on = () => applyResolvedTheme() // 车机日夜模式一变就同时切
       mq.addEventListener('change', on)
       return () => mq.removeEventListener('change', on)
     }
+    let alive = true
+    const tick = () => { ensureSunTimes().then(() => { if (alive) applyResolvedTheme() }) }
+    tick()
+    const t = window.setInterval(tick, 60_000) // 当日已缓存则直接返回,仅跨日会真正联网
+    return () => { alive = false; window.clearInterval(t) }
   }, [pref])
 
   function pick(id: string) {
@@ -45,14 +44,9 @@ export function ThemePicker() {
         <>
           <div className="theme-mask" onClick={() => setOpen(false)} />
           <div className="theme-pop glass">
-            <div className={`theme-row tap ${pref === AUTO_SYS ? 'on' : ''}`} onClick={() => pick(AUTO_SYS)}>
-              <span className="theme-swatch theme-swatch-auto" />
-              <span className="theme-name">自动 · 跟随车机</span>
-              {pref === AUTO_SYS && <span className="theme-check">✓</span>}
-            </div>
             <div className={`theme-row tap ${pref === AUTO ? 'on' : ''}`} onClick={() => pick(AUTO)}>
               <span className="theme-swatch theme-swatch-auto" />
-              <span className="theme-name">自动 · 日出日落</span>
+              <span className="theme-name">自动 · 跟随车机昼夜</span>
               {pref === AUTO && <span className="theme-check">✓</span>}
             </div>
             {THEMES.map((t) => (

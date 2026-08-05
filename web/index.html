@@ -6,25 +6,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TeslaNetEaseMusic</title>
     <script>
-      // 启动即应用主题,避免刷新闪烁。auto = 优先用缓存的当日日出日落判断昼夜,取不到回退固定窗口(6–18 点)。
-      // 逻辑须与 src/ui/themes.ts 的 isDaytime 保持一致。
+      // 启动即应用主题,避免刷新闪烁。auto = 先跟车机深浅(prefers-color-scheme),车机不给偏好再用缓存的当日日出日落(取不到回退 6–18 点)。
+      // 逻辑须与 src/ui/themes.ts 的 resolveTheme/systemScheme/isDaytime 保持一致。
       try {
         var pref = localStorage.getItem('tm.theme') || 'neon';
+        if (pref === 'auto-sys') pref = 'auto'; // 旧"跟随车机"并入统一的自动
         var t = pref;
         var dark = localStorage.getItem('tm.darktheme') || 'neon';
-        if (pref === 'auto-sys') { // 跟随车机/系统深色
-          var sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-          t = sysDark ? dark : 'daylight';
-        } else if (pref === 'auto') { // 跟随日出日落
-          var n = new Date();
-          var ld = n.getFullYear() + '-' + (n.getMonth() + 1) + '-' + n.getDate();
-          var isDay;
-          try {
-            var st = JSON.parse(localStorage.getItem('tm.suntimes') || 'null');
-            if (st && st.d === ld) isDay = (Date.now() >= st.rise && Date.now() < st.set);
-          } catch (e) {}
-          if (isDay === undefined) { var h = n.getHours(); isDay = (h >= 6 && h < 18); }
-          t = isDay ? 'daylight' : dark;
+        if (pref === 'auto') {
+          var sys = null; // 车机深浅偏好:'dark'|'light';都不匹配(不支持/无偏好)则为 null
+          if (window.matchMedia) {
+            if (window.matchMedia('(prefers-color-scheme: dark)').matches) sys = 'dark';
+            else if (window.matchMedia('(prefers-color-scheme: light)').matches) sys = 'light';
+          }
+          if (sys) { // 先跟车机
+            t = sys === 'dark' ? dark : 'daylight';
+          } else { // 车机不给:回退日出日落
+            var n = new Date();
+            var ld = n.getFullYear() + '-' + (n.getMonth() + 1) + '-' + n.getDate();
+            var isDay;
+            try {
+              var st = JSON.parse(localStorage.getItem('tm.suntimes') || 'null');
+              if (st && st.d === ld) isDay = (Date.now() >= st.rise && Date.now() < st.set);
+            } catch (e) {}
+            if (isDay === undefined) { var h = n.getHours(); isDay = (h >= 6 && h < 18); }
+            t = isDay ? 'daylight' : dark;
+          }
         }
         document.documentElement.dataset.theme = t;
       } catch (e) {}
