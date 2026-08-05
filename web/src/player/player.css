@@ -159,9 +159,12 @@
 .quality { position:relative; margin-top:2px; }
 .quality-btn { background:none; border:0; color:var(--text-2); font-size:.9rem; padding:6px 14px; }
 .quality-mask { position:fixed; inset:0; z-index:31; }
-.quality-pop { position:absolute; bottom:100%; left:50%; transform:translateX(-50%); margin-bottom:8px; z-index:32; padding:6px; min-width:130px; }
+.quality-pop { position:absolute; bottom:100%; left:50%; transform:translateX(-50%); margin-bottom:8px; z-index:32; padding:6px; min-width:150px; }
 .quality-row { min-height:46px; justify-content:center; border-radius:8px; color:var(--text); }
 .quality-row.on { color:var(--accent); }
+.quality-row.lowdata { font-size:.9rem; color:var(--text-2); }
+.quality-row.lowdata.on { color:var(--accent); background:color-mix(in srgb, var(--accent) 14%, transparent); }
+.quality-sep { height:1px; margin:4px 8px; background:var(--line, rgba(128,128,128,.25)); }
 
 /* ---- 播放队列面板 ---- */
 .queue-mask { position:fixed; inset:0; z-index:34; background:rgba(0,0,0,.4); }

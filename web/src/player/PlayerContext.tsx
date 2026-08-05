@@ -5,7 +5,7 @@ import { useAudio } from './useAudio'
 import { requestWakeLock } from './wakeLock'
 import { loadPersisted, savePersisted } from './persist'
 import { toast } from '../ui/toast'
-import { loadQuality, saveQuality } from '../ui/quality'
+import { loadQuality, saveQuality, loadLowData, saveLowData, LOW_LEVEL } from '../ui/quality'
 
 export type { Song }
 export interface PlayerState {
@@ -32,11 +32,11 @@ type Action =
   | { type: 'setLrc'; lrc: string; tlyric: string; pureMusic: boolean }
   | { type: 'jumpTo'; pos: number } | { type: 'removeAt'; pos: number }
   | { type: 'enqueueNext'; song: Song } | { type: 'enqueue'; song: Song }
-  | { type: 'reload' }
 
 const identity = (n: number) => Array.from({ length: n }, (_, i) => i)
 const curQueueIndex = (s: PlayerState) => (s.pos >= 0 ? s.order[s.pos] : -1)
 const RADAR_CAP = 150, RADAR_KEEP_BEHIND = 40 // 私人FM 队列上限与保留的已播条数
+const RECOVER_AFTER_MS = 90_000 // 自动降档后,稳定这么久不卡 → 自动升回音质
 
 export function playerReducer(s: PlayerState, a: Action): PlayerState {
   switch (a.type) {
@@ -93,7 +93,6 @@ export function playerReducer(s: PlayerState, a: Action): PlayerState {
       return { ...s, repeat: order[(order.indexOf(s.repeat) + 1) % 3] }
     }
     case 'setLrc': return { ...s, lrc: a.lrc, tlyric: a.tlyric, pureMusic: a.pureMusic }
-    case 'reload': return { ...s, playToken: s.playToken + 1, lrc: '', tlyric: '', pureMusic: false }
     case 'jumpTo':
       if (a.pos < 0 || a.pos >= s.order.length) return s
       return { ...s, pos: a.pos, isPlaying: true, lrc: '', tlyric: '', pureMusic: false, playToken: s.playToken + 1 }
@@ -138,6 +137,7 @@ interface PlayerValue extends PlayerState {
   jumpTo: (pos: number) => void; removeAt: (pos: number) => void
   enqueueNext: (song: Song) => void; enqueue: (song: Song) => void
   quality: string; setQuality: (id: string) => void
+  lowData: boolean; setLowData: (v: boolean) => void
 }
 const Ctx = createContext<PlayerValue | null>(null)
 // 播放进度单独一个 context:每秒 4 次的 currentMs 更新只让用到进度的组件(播放页/迷你条)重渲染,
@@ -160,9 +160,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const playedRef = useRef(0)        // 当前曲已播到的位置(ms)
   const durationRef = useRef(0)
   const curUrlRef = useRef('')       // 当前曲已加载的地址(断网续播时重载用)
+  const curIdRef = useRef(-1)        // 当前曲 id(换音质重载用)
   const interruptedRef = useRef<{ url: string; ms: number } | null>(null) // 中途断网:保住的地址+断点
   const pauseRef = useRef<() => void>(() => {})
   const [netInterrupted, setNetInterrupted] = useState(false) // UI:网络中断,恢复后自动继续
+  const [lowData, setLowDataState] = useState(loadLowData())  // 省流模式(弱网强制最低码率)
+  const lowDataRef = useRef(lowData); lowDataRef.current = lowData
+  const lowDataAutoRef = useRef(false) // 当前省流是"自动降档"触发的吗(自动的只存内存、会话级;手动的写 localStorage)
+  const lastStallAtRef = useRef(0)   // 最后一次真·卡顿时间戳(升回计时用)
+  const stallCountRef = useRef(0)    // 当前曲卡顿次数(在线时反复卡→自动开省流)
 
   // 跳过播不了的歌:连续失败超过队列长度就停,避免死循环
   const advanceAfterUnplayable = useCallback(() => {
@@ -183,22 +189,24 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const handleError = useCallback((e: MediaError | null) => {
     if (interruptedRef.current) return // 已在中断/重连中:继续等,别跳
-    if (playedRef.current > 1500 && curUrlRef.current) { // 本来播得好好的、只是中途断网 → 保住这首,等网络恢复续播
+    // 网络类错误(code 2 或未知)= 不是这首歌的问题;中途断网(已播 >1.5s)同理 → 保住这首,等恢复续播,别跳
+    const networkish = e == null || e.code === 2
+    if (curUrlRef.current && (networkish || playedRef.current > 1500)) {
       interruptedRef.current = { url: curUrlRef.current, ms: playedRef.current }
       pauseRef.current()
       setNetInterrupted(true)
-      toast('网络中断,恢复后自动继续')
+      toast(playedRef.current > 1500 ? '网络中断,恢复后自动继续' : '网络不好,恢复后重试')
       return
     }
-    // 从没播出来 → 不可用,跳过(带提示)
+    // 解码失败/音源不可用 → 这首真播不了,跳过(带提示)
     loadedOkRef.current = false
     if (!isPlayingRef.current) return
-    const msg = e?.code === 2 ? '网络错误' : e?.code === 3 ? '解码失败' : e?.code === 4 ? '音源不可用' : '播放出错'
+    const msg = e?.code === 3 ? '解码失败' : e?.code === 4 ? '音源不可用' : '播放出错'
     toast(`${msg},已跳过`)
     advanceAfterUnplayable()
   }, [advanceAfterUnplayable])
 
-  const { load, play, pause, seek, setVolume, preload, swapToPreloaded, reloadFrom, currentMs, durationMs, bufferedMs, stalled, volume } = useAudio(handleEnded, handleError, boot?.volume ?? 1)
+  const { load, play, pause, seek, setVolume, preload, swapToPreloaded, reloadFrom, currentMs, durationMs, bufferedMs, stalled, stallSeq, volume } = useAudio(handleEnded, handleError, boot?.volume ?? 1)
   const qi = curQueueIndex(state)
   const current = qi >= 0 ? state.queue[qi] : null
   playedRef.current = currentMs
@@ -213,7 +221,35 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const attemptResume = useCallback(() => {
     const it = interruptedRef.current
     if (!it || !isPlayingRef.current) return
-    reloadFromRef.current(it.url, it.ms)
+    reloadFromRef.current(it.url, it.ms, true) // 断网续播:本来就在播,恢复后自动继续
+  }, [])
+  // 有效码率:省流模式强制最低,否则用用户选的音质
+  const effectiveLevel = () => (lowDataRef.current ? LOW_LEVEL : loadQuality())
+  // 换音质/切省流:以新码率重新取地址,从当前位置续播(不从头重来)
+  const applyQualityChange = useCallback(() => {
+    const id = curIdRef.current
+    if (id < 0) return
+    const pos = playedRef.current
+    interruptedRef.current = null; setNetInterrupted(false); stallCountRef.current = 0 // 换档重新观察,别带着切档前的卡顿计数
+    getSongUrl(id, effectiveLevel()).then((r) => {
+      if (r.url) { curUrlRef.current = r.url; reloadFromRef.current(r.url, pos, isPlayingRef.current) } // 暂停时换音质不自动播
+    }).catch(() => {})
+  }, [])
+  // 手动开关省流(UI 用):写 localStorage、跨重启保留,并清掉"自动"标记(手动优先)
+  const setLowData = useCallback((v: boolean) => {
+    lowDataRef.current = v; setLowDataState(v); lowDataAutoRef.current = false
+    saveLowData(v)
+    applyQualityChange()
+  }, [applyQualityChange])
+  // 弱网自动降档(会话级,不写 localStorage):当前曲正卡,立即降码率从断点续播救场
+  const enterLowDataAuto = useCallback(() => {
+    lowDataRef.current = true; setLowDataState(true); lowDataAutoRef.current = true
+    applyQualityChange()
+  }, [applyQualityChange])
+  // 网络转好自动升回:只改状态,不打断当前播放——当前曲省流放完,下一首自然恢复音质
+  const exitLowDataAuto = useCallback(() => {
+    lowDataRef.current = false; setLowDataState(false); lowDataAutoRef.current = false
+    stallCountRef.current = 0
   }, [])
 
   // 持久化:队列/顺序/位置/设置/音量变化时写入(不含播放进度)
@@ -224,7 +260,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // 取播放地址(关键)与歌词(尽力而为,失败不连累播放)
   useEffect(() => {
     if (!current) return
-    interruptedRef.current = null; setNetInterrupted(false); playedRef.current = 0 // 换曲:清掉上一首的断网状态
+    interruptedRef.current = null; setNetInterrupted(false); playedRef.current = 0; stallCountRef.current = 0; curIdRef.current = current.id // 换曲:清掉上一首的断网/卡顿状态
     let cancelled = false
     ;(async () => {
       // 下一首已预载并缓冲在备用元素:直接切过去,复用字节、不重新下载
@@ -241,9 +277,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         return
       }
       let url: string | null = null
-      try { url = (await getSongUrl(current.id, loadQuality())).url }
+      try { url = (await getSongUrl(current.id, effectiveLevel())).url }
       catch {
-        if (!cancelled && isPlayingRef.current) advanceAfterUnplayable()
+        // 取地址失败(已内部超时+重试仍不通)= 网络问题,不是这首歌的问题。别逐首跳,提示后停下(return 不前进)等用户重试。
+        if (!cancelled && isPlayingRef.current) toast('网络不好,加载失败,请稍后重试')
         return
       }
       if (cancelled) return
@@ -290,6 +327,28 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const it = interruptedRef.current
     if (it && currentMs > it.ms + 300) { interruptedRef.current = null; setNetInterrupted(false); skipRef.current = 0 } // 已续上
   }, [currentMs])
+  // 弱网自动降音质(会话级):在线播放中当前曲反复卡顿(≥2次)→ 自动开省流,当前曲以低码率从断点续播
+  useEffect(() => {
+    if (stallSeq === 0 || !navigator.onLine) return // 初始;离线是断网续播的事,降码率无济于事
+    lastStallAtRef.current = Date.now() // 每次真·卡顿都记下(即便已在省流,用于推迟"升回")
+    if (!isPlayingRef.current || lowDataRef.current) return
+    stallCountRef.current += 1
+    if (stallCountRef.current >= 2) {
+      stallCountRef.current = 0
+      toast('网络较差,已自动切到省流音质')
+      enterLowDataAuto()
+    }
+  }, [stallSeq]) // eslint-disable-line react-hooks/exhaustive-deps
+  // 网络转好自动升回:仅针对"自动降档"(手动开的省流不动),稳定 RECOVER_AFTER_MS 不卡且在线播放中 → 升回
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      if (!lowDataAutoRef.current || !isPlayingRef.current || !navigator.onLine) return
+      if (Date.now() - lastStallAtRef.current < RECOVER_AFTER_MS) return
+      toast('网络已恢复,音质自动升回')
+      exitLowDataAuto()
+    }, 5000)
+    return () => window.clearInterval(t)
+  }, [exitLowDataAuto])
 
   // 私人FM:接近队尾时预取下一批,形成无限流
   const fetchingRef = useRef(false)
@@ -314,7 +373,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (np < 0 || np === state.pos) return // 无下一首 / 单曲循环
     const nextSong = state.queue[state.order[np]]
     if (!nextSong || preloadedRef.current?.id === nextSong.id) return
-    getSongUrl(nextSong.id, loadQuality()).then((r) => {
+    getSongUrl(nextSong.id, effectiveLevel()).then((r) => {
       if (!r.url) return
       preloadedRef.current = { id: nextSong.id, url: r.url }
       preload(r.url) // 用备用元素缓冲下一首的字节
@@ -372,7 +431,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   // 音质:持久化选择,切换后重载当前曲以新音质取地址
   const [quality, setQualityState] = useState(loadQuality())
-  const setQuality = useCallback((id: string) => { setQualityState(id); saveQuality(id); dispatch({ type: 'reload' }) }, [])
+  // 手动选具体音质:关掉省流模式,以新码率从当前位置续播
+  const setQuality = useCallback((id: string) => {
+    setQualityState(id); saveQuality(id)
+    if (lowDataRef.current) { lowDataRef.current = false; setLowDataState(false); lowDataAutoRef.current = false; saveLowData(false) }
+    applyQualityChange()
+  }, [applyQualityChange])
 
   // 红心(“我喜欢的音乐”):加载红心列表,提供 isLiked / toggleLike(乐观更新+失败回滚并提示)
   const [likedIds, setLikedIds] = useState<Set<number>>(new Set())
@@ -396,7 +460,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const progress = useMemo(() => ({ currentMs, durationMs, bufferedMs, stalled, netInterrupted }), [currentMs, durationMs, bufferedMs, stalled, netInterrupted])
   // value 不含 currentMs/durationMs,依赖项在进度 tick 时都不变 → 引用稳定,usePlayer 消费方不会每秒重渲染 4 次
   const value = useMemo<PlayerValue>(() => ({
-    ...state, current, volume, queueSongs, quality, setQuality,
+    ...state, current, volume, queueSongs, quality, setQuality, lowData, setLowData,
     isLiked, toggleLike,
     jumpTo: (pos) => dispatch({ type: 'jumpTo', pos }),
     removeAt: (pos) => dispatch({ type: 'removeAt', pos }),
@@ -410,7 +474,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     seek: seekStable, setVolume: setVolumeStable,
     setShuffle: (on) => dispatch({ type: 'setShuffle', on }),
     cycleRepeat: () => dispatch({ type: 'cycleRepeat' }),
-  }), [state, current, volume, queueSongs, quality, setQuality, isLiked, toggleLike, seekStable, setVolumeStable])
+  }), [state, current, volume, queueSongs, quality, setQuality, lowData, setLowData, isLiked, toggleLike, seekStable, setVolumeStable])
 
   return (
     <Ctx.Provider value={value}>
