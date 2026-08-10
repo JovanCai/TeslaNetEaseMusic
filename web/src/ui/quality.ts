@@ -26,3 +26,11 @@ export function saveLowData(v: boolean): void {
 export function qualityName(id: string): string {
   return QUALITIES.find((q) => q.id === id)?.name ?? '极高'
 }
+
+// 从某档位起、逐级向下到最低的链(含自身)。用于当前音质取不到音源时自动降档找有源的。
+// 例:hires → [hires, lossless, exhigh, higher, standard];standard → [standard]
+export function levelsAtOrBelow(level: string): string[] {
+  const idx = QUALITIES.findIndex((q) => q.id === level)
+  if (idx < 0) return [level]
+  return QUALITIES.slice(0, idx + 1).map((q) => q.id).reverse()
+}

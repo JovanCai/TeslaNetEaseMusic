@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { loadLowData, saveLowData, loadQuality, LOW_LEVEL, QUALITIES } from './quality'
+import { loadLowData, saveLowData, loadQuality, LOW_LEVEL, QUALITIES, levelsAtOrBelow } from './quality'
 
 describe('省流模式(lowdata)持久化', () => {
   beforeEach(() => localStorage.clear())
@@ -26,5 +26,18 @@ describe('省流模式(lowdata)持久化', () => {
     saveLowData(true)
     expect(loadQuality()).toBe('exhigh') // 默认音质不受省流开关影响
     expect(loadLowData()).toBe(true)
+  })
+})
+
+describe('降档链 levelsAtOrBelow(取不到音源时逐级往下找)', () => {
+  it('高档从自身逐级降到最低', () => {
+    expect(levelsAtOrBelow('hires')).toEqual(['hires', 'lossless', 'exhigh', 'higher', 'standard'])
+    expect(levelsAtOrBelow('exhigh')).toEqual(['exhigh', 'higher', 'standard'])
+  })
+  it('最低档没得降,只有自身', () => {
+    expect(levelsAtOrBelow('standard')).toEqual(['standard'])
+  })
+  it('未知档位原样返回(不炸)', () => {
+    expect(levelsAtOrBelow('weird')).toEqual(['weird'])
   })
 })

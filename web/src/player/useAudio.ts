@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-export function useAudio(onEnded?: () => void, onError?: (e: MediaError | null) => void, initialVolume = 1) {
+export function useAudio(onEnded?: (posMs: number, durMs: number) => void, onError?: (e: MediaError | null) => void, initialVolume = 1) {
   const [currentMs, setCurrentMs] = useState(0)
   const [durationMs, setDurationMs] = useState(0)
   const [bufferedMs, setBufferedMs] = useState(0) // 已缓冲到的位置(播放条上的浅色加载进度)
@@ -41,7 +41,7 @@ export function useAudio(onEnded?: () => void, onError?: (e: MediaError | null) 
     // 只有"已放出声之后"再等数据才算网络扛不住当前码率;起播/换音质/seek 的蓄流不计入降档
     const onWaiting = () => { setStalled(true); if (playedOnceRef.current) setStallSeq((n) => n + 1) }
     const onPlaying = () => { setStalled(false); playedOnceRef.current = true }
-    const onEnd = () => cb.current.onEnded?.()
+    const onEnd = () => cb.current.onEnded?.(a.currentTime * 1000, a.duration * 1000) // 读实时位置,后台 timeupdate 被节流也准
     const onErr = () => cb.current.onError?.(a.error) // 播放/解码/网络失败:交给上层处理
     a.addEventListener('timeupdate', onTime)
     a.addEventListener('loadedmetadata', onMeta)
