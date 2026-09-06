@@ -206,9 +206,39 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     advanceAfterUnplayable()
   }, [advanceAfterUnplayable])
 
-  const { load, play, pause, seek, setVolume, preload, swapToPreloaded, reloadFrom, currentMs, durationMs, bufferedMs, stalled, stallSeq, volume } = useAudio(handleEnded, handleError, boot?.volume ?? 1)
   const qi = curQueueIndex(state)
   const current = qi >= 0 ? state.queue[qi] : null
+  // Media Session 元数据:封面 + 歌名。车机媒体卡片副标题被浏览器占用来显示页面 URL、
+  // 不渲染 artist 字段,所以把歌手并进标题行,保证车机上能看到歌手名。
+  const syncMediaMetadata = useCallback(() => {
+    if (!('mediaSession' in navigator)) return
+    const ms = navigator.mediaSession
+    if (!current) { ms.metadata = null; document.title = 'TeslaNetEaseMusic'; return }
+    const cover = current.cover
+    const title = current.artist ? `${current.name} · ${current.artist}` : current.name
+    try {
+      ms.metadata = new MediaMetadata({
+        title,
+        artist: current.artist,
+        album: current.artist, // 冗余兜底:部分车机副标题取 album
+        artwork: cover
+          ? [128, 256, 512].map((s) => ({ src: `${cover}?param=${s}y${s}`, sizes: `${s}x${s}`, type: 'image/jpeg' }))
+          : [],
+      })
+    } catch { /* 老内核不支持 MediaMetadata 则跳过 */ }
+    document.title = `${current.name} - ${current.artist}`
+  }, [current])
+
+  // 先发布新曲信息，再进入下方加载/预载切换 effect，避免起播读取上一首封面。
+  useEffect(syncMediaMetadata, [syncMediaMetadata])
+  const handlePlayRejected = useCallback((error: unknown) => {
+    const name = error && typeof error === 'object' && 'name' in error ? String(error.name) : 'UnknownError'
+    // 不再吞掉起播失败并保持“播放中”，否则系统播放键也无法重新启动。
+    dispatch({ type: 'stop' })
+    toast(name === 'NotAllowedError' ? '浏览器阻止了自动播放，请点播放继续' : '播放启动失败，请点播放重试')
+    console.warn('[player] play rejected', { name, visibility: document.visibilityState })
+  }, [])
+  const { load, play, pause, seek, setVolume, preload, swapToPreloaded, reloadFrom, currentMs, durationMs, bufferedMs, stalled, stallSeq, volume } = useAudio(handleEnded, handleError, boot?.volume ?? 1, syncMediaMetadata, handlePlayRejected)
   playedRef.current = currentMs
   pauseRef.current = pause
   const seekRef = useRef(seek); seekRef.current = seek
@@ -403,27 +433,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     set('nexttrack', () => dispatch({ type: 'next' }))
     set('seekto', (d) => { if (d.seekTime != null) seekRef.current(d.seekTime * 1000) })
   }, [])
-
-  // Media Session 元数据:封面 + 歌名。车机媒体卡片副标题被浏览器占用来显示页面 URL、
-  // 不渲染 artist 字段,所以把歌手并进标题行,保证车机上能看到歌手名。
-  useEffect(() => {
-    if (!('mediaSession' in navigator)) return
-    const ms = navigator.mediaSession
-    if (!current) { ms.metadata = null; document.title = 'TeslaNetEaseMusic'; return }
-    const cover = current.cover
-    const title = current.artist ? `${current.name} · ${current.artist}` : current.name
-    try {
-      ms.metadata = new MediaMetadata({
-        title,
-        artist: current.artist,
-        album: current.artist, // 冗余兜底:部分车机副标题取 album
-        artwork: cover
-          ? [128, 256, 512].map((s) => ({ src: `${cover}?param=${s}y${s}`, sizes: `${s}x${s}`, type: 'image/jpeg' }))
-          : [],
-      })
-    } catch { /* 老内核不支持 MediaMetadata 则跳过 */ }
-    document.title = `${current.name} - ${current.artist}`
-  }, [current?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = state.isPlaying ? 'playing' : 'paused'
