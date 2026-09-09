@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { diagnostic, diagnosticSnapshot, mediaFingerprint } from './diagnostics'
 
 export function useAudio(onEnded?: (posMs: number, durMs: number) => void, onError?: (e: MediaError | null) => void, initialVolume = 1, onPlaybackStarted?: () => void, onPlayRejected?: (error: unknown) => void) {
   const [currentMs, setCurrentMs] = useState(0)
@@ -25,6 +26,13 @@ export function useAudio(onEnded?: (posMs: number, durMs: number) => void, onErr
   const [activeIdx, setActiveIdx] = useState(0) // 变化时同步新活动元素的进度与缓冲
   const cur = () => pair[activeIdxRef.current]
   const spare = () => pair[1 - activeIdxRef.current]
+  const audioSnapshot = (a: HTMLAudioElement, index: number) => ({ element: index, active: index === activeIdxRef.current, source: mediaFingerprint(a.currentSrc || a.src), seconds: Number.isFinite(a.currentTime) ? Math.round(a.currentTime) : -1, duration: Number.isFinite(a.duration) ? Math.round(a.duration) : -1, paused: a.paused, ended: a.ended, ready: a.readyState, network: a.networkState, error: a.error?.code ?? 0 })
+  useEffect(() => {
+    const report = () => pair.forEach((a, index) => diagnostic('audio.snapshot', audioSnapshot(a, index)))
+    window.addEventListener('tm-diagnostic-snapshot', report)
+    document.addEventListener('visibilitychange', report)
+    return () => { window.removeEventListener('tm-diagnostic-snapshot', report); document.removeEventListener('visibilitychange', report) }
+  }, [pair])
 
   // 永久监听两个元素并过滤备用元素，交换后不依赖 React 重绑事件才能继续播放。
   useEffect(() => {
@@ -46,9 +54,16 @@ export function useAudio(onEnded?: (posMs: number, durMs: number) => void, onErr
       const onPlaying = () => { setStalled(false); playedOnceRef.current = true; lastPlayedIdxRef.current = index; cb.current.onPlaybackStarted?.() }
       const onEnd = () => cb.current.onEnded?.(a.currentTime * 1000, a.duration * 1000) // 读实时位置,后台 timeupdate 被节流也准
       const onErr = () => cb.current.onError?.(a.error) // 播放/解码/网络失败:交给上层处理
-      const handlers: Record<string, () => void> = { timeupdate: onTime, loadedmetadata: onMeta, progress: onProgress, waiting: onWaiting, stalled: onWaiting, playing: onPlaying, ended: onEnd, error: onErr }
+      let lastTick = 0
+      const handlers: Record<string, () => void> = { timeupdate: onTime, loadedmetadata: onMeta, progress: onProgress, waiting: onWaiting, stalled: onWaiting, playing: onPlaying, ended: onEnd, error: onErr, pause: () => {}, play: () => {}, canplay: () => {}, emptied: () => {} }
       const listeners = Object.entries(handlers).map(([event, handler]) => {
-        const listener = () => { if (index === activeIdxRef.current) handler() }
+        const listener = () => {
+          if (diagnosticSnapshot().enabled && event !== 'progress' && (event !== 'timeupdate' || Date.now() - lastTick >= 10000)) {
+            if (event === 'timeupdate') lastTick = Date.now()
+            diagnostic(`audio.${event}`, audioSnapshot(a, index))
+          }
+          if (index === activeIdxRef.current) handler()
+        }
         a.addEventListener(event, listener)
         return () => a.removeEventListener(event, listener)
       })
@@ -69,15 +84,19 @@ export function useAudio(onEnded?: (posMs: number, durMs: number) => void, onErr
     const a = cur(), index = activeIdxRef.current, src = a.src
     const request = ++playRequestRef.current
     const isCurrent = () => request === playRequestRef.current && index === activeIdxRef.current && a.src === src
+    if (diagnosticSnapshot().enabled) diagnostic('play.request', { request, ...audioSnapshot(a, index) })
     try {
       await a.play()
+      diagnostic('play.resolved', { request, element: index, current: isCurrent() })
       if (isCurrent()) lastPlayedIdxRef.current = index
     } catch (error) {
+      diagnostic('play.rejected', { request, element: index, current: isCurrent(), name: error && typeof error === 'object' && 'name' in error ? String(error.name) : 'unknown' })
       if (!isCurrent()) return // 已切歌或暂停，旧请求不能影响新的播放状态。
       const name = error && typeof error === 'object' && 'name' in error ? String(error.name) : ''
       const previous = lastPlayedIdxRef.current
       // 若内核拒绝后台启用另一个音频元素，只回退一次，复用已成功播放过的元素。
       if (name === 'NotAllowedError' && allowFallback && previous != null && previous !== index) {
+        diagnostic('play.fallback', { from: index, to: previous })
         a.pause()
         activeIdxRef.current = previous
         spareUrlRef.current = ''
@@ -102,6 +121,7 @@ export function useAudio(onEnded?: (posMs: number, durMs: number) => void, onErr
   function reloadFrom(url: string, ms: number, play = true) { ++playRequestRef.current; resumeRef.current = { ms, play }; playedOnceRef.current = false; const a = cur(); setStalled(true); a.src = url; a.load() }
   // 切到已预载的备用元素(已缓冲下一首)。备用地址不匹配则返回 false,让调用方走普通加载。
   function swapToPreloaded(url: string): boolean {
+    diagnostic('audio.swap', { matched: spareUrlRef.current === url, from: activeIdxRef.current })
     if (spareUrlRef.current !== url) return false
     pause() // 停掉旧的活动元素
     activeIdxRef.current = 1 - activeIdxRef.current

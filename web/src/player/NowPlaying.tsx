@@ -6,6 +6,8 @@ import { QueueView } from './QueueView'
 import { QualityPicker } from '../components/QualityPicker'
 import { Icon } from '../components/Icon'
 import './player.css'
+import { DiagnosticPanel } from './DiagnosticPanel'
+import { diagnosticSnapshot, setDiagnostics, useDiagnosticEntry } from './diagnostics'
 
 function fmt(ms: number) {
   const s = Math.max(0, Math.floor(ms / 1000))
@@ -18,6 +20,9 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
   onOpenArtist: (artistId: number) => void
 }) {
   const p = usePlayer()
+  const enterDiagnostics = useDiagnosticEntry(() => {
+    if (!diagnosticSnapshot().enabled) setDiagnostics(true)
+  })
   const { currentMs, durationMs, bufferedMs, stalled, netInterrupted } = usePlayerProgress()
   const npRef = useRef<HTMLDivElement>(null)
   const flipFirst = useRef<Map<string, DOMRect> | null>(null)
@@ -188,7 +193,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
         </div>
       )}
       <div className="np-top" data-flip="top">
-        {cur.cover && <img key={cur.id} className="np-cover" src={cur.cover} alt="" />}
+        {cur.cover && <img key={cur.id} className="np-cover" src={cur.cover} alt="" draggable={false} onClick={enterDiagnostics} />}
         <div className="np-title">{cur.name}</div>
         <div className="np-artist">{cur.artist}</div>
         {(netInterrupted || stalled) && (
@@ -253,6 +258,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
       )}
 
       {showQueue && <QueueView onClose={() => setShowQueue(false)} />}
+      {open && <DiagnosticPanel />}
     </div>
   )
 }

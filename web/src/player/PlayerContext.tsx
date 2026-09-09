@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useReducer,
 import { nextIndex, prevIndex, buildShuffleOrder, type Repeat } from './queue'
 import { getSongUrl, getLyric, getPersonalFm, getLikedIds, setLike, getLoginStatus, type Song } from '../api'
 import { useAudio } from './useAudio'
+import { diagnostic, mediaFingerprint } from './diagnostics'
 import { requestWakeLock } from './wakeLock'
 import { loadPersisted, savePersisted } from './persist'
 import { toast } from '../ui/toast'
@@ -179,6 +180,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // 曲终自动续播;但若远未到真实时长(播到缓冲末尾就"结束"),多半是断网,当作中断而非前进。
   // 用元素结束时的实时 pos/dur(useAudio 传入),不用 playedRef —— 后台/导航时 timeupdate 被节流,快照会停更导致误判。
   const handleEnded = useCallback((posMs: number, durMs: number) => {
+    diagnostic('queue.ended', { posMs, durMs })
     if (durMs > 0 && posMs < durMs - 3000 && curUrlRef.current) {
       interruptedRef.current = { url: curUrlRef.current, ms: posMs }
       setNetInterrupted(true)
@@ -208,10 +210,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const qi = curQueueIndex(state)
   const current = qi >= 0 ? state.queue[qi] : null
+  useEffect(() => {
+    const report = () => diagnostic('queue.state', { song: current?.id ?? -1, pos: state.pos, token: state.playToken, playing: state.isPlaying, count: state.order.length, repeat: state.repeat, cover: mediaFingerprint(current?.cover ?? ''), submitted: mediaFingerprint(navigator.mediaSession?.metadata?.artwork[0]?.src ?? '') })
+    report()
+    window.addEventListener('tm-diagnostic-snapshot', report)
+    return () => window.removeEventListener('tm-diagnostic-snapshot', report)
+  }, [current, state.pos, state.playToken, state.isPlaying, state.order.length, state.repeat])
   // Media Session 元数据:封面 + 歌名。车机媒体卡片副标题被浏览器占用来显示页面 URL、
   // 不渲染 artist 字段,所以把歌手并进标题行,保证车机上能看到歌手名。
   const syncMediaMetadata = useCallback(() => {
-    if (!('mediaSession' in navigator)) return
+    if (!('mediaSession' in navigator)) { diagnostic('metadata.unsupported'); return }
     const ms = navigator.mediaSession
     if (!current) { ms.metadata = null; document.title = 'TeslaNetEaseMusic'; return }
     const cover = current.cover
@@ -225,7 +233,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
           ? [128, 256, 512].map((s) => ({ src: `${cover}?param=${s}y${s}`, sizes: `${s}x${s}`, type: 'image/jpeg' }))
           : [],
       })
-    } catch { /* 老内核不支持 MediaMetadata 则跳过 */ }
+      diagnostic('metadata.set', { song: current.id, cover: mediaFingerprint(cover), submitted: mediaFingerprint(ms.metadata?.artwork[0]?.src ?? '') })
+    } catch { diagnostic('metadata.failed', { song: current.id }) }
     document.title = `${current.name} - ${current.artist}`
   }, [current])
 
@@ -289,6 +298,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   // 取播放地址(关键)与歌词(尽力而为,失败不连累播放)
   useEffect(() => {
     if (!current) return
+    diagnostic('track.load', { song: current.id, token: state.playToken })
     interruptedRef.current = null; setNetInterrupted(false); playedRef.current = 0; stallCountRef.current = 0; curIdRef.current = current.id // 换曲:清掉上一首的断网/卡顿状态
     let cancelled = false
     ;(async () => {
@@ -312,10 +322,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       try {
         for (const lv of levelsAtOrBelow(want)) {
           const r = await getSongUrl(current.id, lv)
+          diagnostic('track.url', { song: current.id, level: lv, available: !!r.url, cancelled })
           if (cancelled) return
           if (r.url) { url = r.url; usedLevel = lv; break }
         }
       } catch {
+        diagnostic('track.url-failed', { song: current.id, cancelled })
         // 取地址失败(已内部超时+重试仍不通)= 网络问题,不是这首歌的问题。别逐首跳,提示后停下(return 不前进)等用户重试。
         if (!cancelled && isPlayingRef.current) toast('网络不好,加载失败,请稍后重试')
         return
@@ -425,7 +437,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (!('mediaSession' in navigator)) return
     const ms = navigator.mediaSession
     const set = (action: MediaSessionAction, handler: MediaSessionActionHandler) => {
-      try { ms.setActionHandler(action, handler) } catch { /* 该动作不支持则跳过 */ }
+      try { ms.setActionHandler(action, details => { diagnostic('media.action', { action }); handler(details) }) } catch { /* 该动作不支持则跳过 */ }
     }
     set('play', () => { if (!isPlayingRef.current) dispatch({ type: 'toggle' }) })
     set('pause', () => { if (isPlayingRef.current) dispatch({ type: 'toggle' }) })
