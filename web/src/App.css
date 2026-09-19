@@ -1,4 +1,4 @@
-.shell { min-height:100vh; }
+.shell { min-height:var(--app-height,100vh); }
 .content { padding:16px 16px 180px; max-width:900px; margin:0 auto; }
 
 /* 主题切换 */
@@ -93,7 +93,16 @@
 .tabbtn:active { transform:scale(.95); }
 .tabbtn.active { color:var(--accent); background:rgba(var(--accent-rgb),.1); text-shadow:0 0 12px rgba(var(--accent-rgb),.5); }
 
-.login { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; }
+.login { min-height:var(--app-height,100vh); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; }
 .login h1 { font-size:2.4rem; margin:0; }
 .login-tip { color:var(--text-2); }
 .login-qr { width:260px; height:260px; padding:16px; background:#fff; }
+
+.theme-pop { max-height:calc(var(--app-height,100vh) - 88px); overflow-y:auto; max-width:calc(100% - 28px); }
+.display-size { padding:8px 4px 12px; border-bottom:1px solid var(--border); }
+.display-options { display:flex; gap:4px; margin:8px 0; flex-wrap:wrap; }
+.display-options button { min-height:48px; min-width:48px; padding:4px 8px; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); }
+.display-options button[aria-pressed="true"] { border-color:var(--accent); color:var(--accent); }
+.display-size small { color:var(--text-2); }
+
+.normalize-toggle { width:100%; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); min-height:48px; margin-bottom:6px; }

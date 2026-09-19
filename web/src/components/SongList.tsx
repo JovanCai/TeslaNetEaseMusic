@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Song } from '../api'
 import { usePlayer } from '../player/PlayerContext'
+import { displayScale } from '../ui/displayScale'
 import { Icon } from './Icon'
 
 const ROW = 72       // 每行固定高度(px)
@@ -16,9 +17,9 @@ export function SongList({ songs }: { songs: Song[] }) {
     const compute = () => {
       const el = ref.current
       if (!el) return
-      const listTop = el.getBoundingClientRect().top + window.scrollY
-      const start = Math.max(0, Math.floor((window.scrollY - listTop) / ROW) - OVERSCAN)
-      const count = Math.ceil(window.innerHeight / ROW) + OVERSCAN * 2
+      const rowHeight = ROW * displayScale()
+      const start = Math.max(0, Math.floor(-el.getBoundingClientRect().top / rowHeight) - OVERSCAN)
+      const count = Math.ceil(window.innerHeight / rowHeight) + OVERSCAN * 2
       setRange({ start, end: Math.min(songs.length, start + count) })
     }
     compute()

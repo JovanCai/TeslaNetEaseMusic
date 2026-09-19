@@ -6,6 +6,7 @@ import { QueueView } from './QueueView'
 import { QualityPicker } from '../components/QualityPicker'
 import { Icon } from '../components/Icon'
 import './player.css'
+import { displayScale } from '../ui/displayScale'
 import { DiagnosticPanel } from './DiagnosticPanel'
 import { diagnosticSnapshot, setDiagnostics, useDiagnosticEntry } from './diagnostics'
 
@@ -68,16 +69,21 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
   const [splitW, setSplitW] = useState(() => {
     try {
       const v = Number(localStorage.getItem('tm.splitw')) || 440
-      return Math.max(340, Math.min(760, window.innerWidth * 0.62, v))
+      return Math.max(340, Math.min(760, window.innerWidth / displayScale() * 0.62, v))
     } catch { return 440 }
   })
   const splitWRef = useRef(splitW)
   splitWRef.current = splitW
+  useEffect(() => {
+    const clamp = () => setSplitW(value => Math.max(340, Math.min(760, window.innerWidth / displayScale() * 0.62, value)))
+    window.addEventListener('resize', clamp)
+    return () => window.removeEventListener('resize', clamp)
+  }, [])
   function onDividerDown(e: React.PointerEvent) {
     e.preventDefault()
     const startX = e.clientX, startW = splitWRef.current
-    const maxW = Math.min(760, window.innerWidth * 0.62)
-    const move = (ev: PointerEvent) => setSplitW(Math.max(340, Math.min(maxW, startW + (ev.clientX - startX))))
+    const maxW = Math.min(760, window.innerWidth / displayScale() * 0.62)
+    const move = (ev: PointerEvent) => setSplitW(Math.max(340, Math.min(maxW, startW + (ev.clientX - startX) / displayScale())))
     const up = () => {
       document.removeEventListener('pointermove', move)
       document.removeEventListener('pointerup', up)
@@ -143,7 +149,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
       const f = first.get(el.dataset.flip!)
       if (!f) return
       const l = el.getBoundingClientRect()
-      const dx = f.left - l.left, dy = f.top - l.top
+      const dx = (f.left - l.left) / displayScale(), dy = (f.top - l.top) / displayScale()
       const sx = l.width ? f.width / l.width : 1, sy = l.height ? f.height / l.height : 1
       el.style.willChange = 'transform' // 仅动画期间加,避免常驻改变 fixed 定位基准
       el.style.transition = 'none'

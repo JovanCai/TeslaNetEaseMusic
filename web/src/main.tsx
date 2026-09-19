@@ -5,6 +5,10 @@ import './ui/theme.css'
 import App from './App.tsx'
 import { PlayerProvider } from './player/PlayerContext'
 
+import { initializeDisplayScale } from './ui/displayScale'
+
+initializeDisplayScale()
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <PlayerProvider>

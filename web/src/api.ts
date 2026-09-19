@@ -1,3 +1,4 @@
+import type { ReplayGain } from './player/normalization'
 const BASE = '/api'
 
 // 统一请求:加超时(默认 8s,弱网下不会无限转圈)与失败退避重试(默认 2 次)。
@@ -21,12 +22,15 @@ async function fetchJson(path: string, { timeout = 8000, retries = 2 } = {}): Pr
   throw lastErr
 }
 
-export async function getSongUrl(id: number, level = 'exhigh'): Promise<{ id: number; url: string | null }> {
+export async function getSongUrl(id: number, level = 'exhigh'): Promise<{ id: number; url: string | null } & ReplayGain> {
   // 区域解锁(realIP)由后端按需自动注入,前端无需传参。
   const j: any = await fetchJson(`/song/url/v1?id=${id}&level=${level}`)
   const raw: string | null = j?.data?.[0]?.url ?? null
   // 网易云常返回 http:// 地址;车机走 https 时 http 音频会被当混合内容拦掉,统一升级为 https。
-  return { id, url: raw ? raw.replace(/^http:\/\//, 'https://') : null }
+  return { id, url: raw ? raw.replace(/^http:\/\//, 'https://') : null,
+    ...(typeof j?.data?.[0]?.gain === 'number' && Number.isFinite(j.data[0].gain) ? { gain: j.data[0].gain } : {}),
+    ...(typeof j?.data?.[0]?.peak === 'number' && Number.isFinite(j.data[0].peak) ? { peak: j.data[0].peak } : {}),
+  }
 }
 
 export async function getLyric(id: number): Promise<{ lrc: string; tlyric: string; pureMusic: boolean }> {

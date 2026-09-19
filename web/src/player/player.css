@@ -20,13 +20,11 @@
 .mini-artist { color:var(--text-2); font-size:.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 /* 车机/宽屏:加大迷你条控制键,方便驾驶中盲按(右舵手从右侧够,最右为“下一首”)。
    窄屏(手机)保持原尺寸,避免挤压歌曲信息。 */
-@media (min-width:821px) {
-  .mini { padding:10px 16px; gap:10px; }
-  .mini > .iconbtn { min-width:80px; height:80px; }
-  .mini > .iconbtn svg { width:34px; height:34px; }
-  .mini > .mini-play { min-width:96px; height:96px; }
-  .mini > .mini-play svg { width:46px; height:46px; }
-}
+html[data-wide="true"] .mini { padding:10px 16px; gap:10px; }
+html[data-wide="true"] .mini > .iconbtn { min-width:80px; height:80px; }
+html[data-wide="true"] .mini > .iconbtn svg { width:34px; height:34px; }
+html[data-wide="true"] .mini > .mini-play { min-width:96px; height:96px; }
+html[data-wide="true"] .mini > .mini-play svg { width:46px; height:46px; }
 
 /* ---- 全屏播放页 ---- */
 .np { position:fixed; inset:0; z-index:30; display:grid; align-items:stretch;
@@ -76,26 +74,23 @@
 .np-layout-toggle { position:absolute; top:16px; left:16px; z-index:3;
   min-width:52px; height:52px; border:1px solid var(--border); border-radius:14px; background:var(--glass); }
 
-@media (max-width:820px) { /* 窄屏:分栏退回竖排三行,切换无视觉差,隐藏布局按钮与分隔条免困惑 */
-  .np.split { grid-template-columns:1fr; grid-template-rows:auto minmax(0,1fr) auto;
-    grid-template-areas:"top" "lyrics" "bottom"; column-gap:0; }
-  .np-layout-toggle, .np-divider { display:none; }
-}
+/* 窄屏:分栏退回竖排三行,切换无视觉差,隐藏布局按钮与分隔条免困惑 */
+html[data-wide="false"] .np.split { grid-template-columns:1fr; grid-template-rows:auto minmax(0,1fr) auto;
+  grid-template-areas:"top" "lyrics" "bottom"; column-gap:0; }
+html[data-wide="false"] .np-layout-toggle, html[data-wide="false"] .np-divider { display:none; }
 
 /* 车机/宽屏:只放大「上一首/下一首」到与播放键同大,便于驾驶中点击(常用滚动歌词视图)。
    其余键、操作排保持原尺寸;窄屏手机不放大,避免控制排超出屏宽。
    图标用 CSS 覆盖 Icon 的内联尺寸。 */
-@media (min-width:821px) {
-  .np-ctl .iconbtn[aria-label="上一首"],
-  .np-ctl .iconbtn[aria-label="下一首"] { min-width:84px; height:84px; }
-  .np-ctl .iconbtn[aria-label="上一首"] svg,
-  .np-ctl .iconbtn[aria-label="下一首"] svg { width:40px; height:40px; }
-  /* 左栏被拖得较窄(<430)时,大三键放不下,自动缩回原尺寸避免溢出 */
-  .np.ctl-sm .np-ctl .iconbtn[aria-label="上一首"],
-  .np.ctl-sm .np-ctl .iconbtn[aria-label="下一首"] { min-width:64px; height:64px; }
-  .np.ctl-sm .np-ctl .iconbtn[aria-label="上一首"] svg,
-  .np.ctl-sm .np-ctl .iconbtn[aria-label="下一首"] svg { width:22px; height:22px; }
-}
+html[data-wide="true"] .np-ctl .iconbtn[aria-label="上一首"],
+html[data-wide="true"] .np-ctl .iconbtn[aria-label="下一首"] { min-width:84px; height:84px; }
+html[data-wide="true"] .np-ctl .iconbtn[aria-label="上一首"] svg,
+html[data-wide="true"] .np-ctl .iconbtn[aria-label="下一首"] svg { width:40px; height:40px; }
+/* 左栏被拖得较窄(<430)时,大三键放不下,自动缩回原尺寸避免溢出 */
+html[data-wide="true"] .np.ctl-sm .np-ctl .iconbtn[aria-label="上一首"],
+html[data-wide="true"] .np.ctl-sm .np-ctl .iconbtn[aria-label="下一首"] { min-width:64px; height:64px; }
+html[data-wide="true"] .np.ctl-sm .np-ctl .iconbtn[aria-label="上一首"] svg,
+html[data-wide="true"] .np.ctl-sm .np-ctl .iconbtn[aria-label="下一首"] svg { width:22px; height:22px; }
 .np-cover { width:132px; height:132px; border-radius:20px; margin:0 0 12px; object-fit:cover;
   box-shadow:0 12px 40px rgba(0,0,0,.5), 0 0 0 1px var(--border); animation:npFadeUp .45s ease; }
 /* 切歌时封面 / 歌词丝滑淡入(靠 key=歌曲id 重挂载触发) */
@@ -183,3 +178,14 @@
 .queue-name { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .queue-artist { color:var(--text-2); font-size:.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .queue-x { min-width:44px; height:44px; background:none; border:0; color:var(--text-2); font-size:1.05rem; flex-shrink:0; }
+
+/* Compact controls keep the lyric region usable in shorter browser windows. */
+html[data-short="true"] .np { padding-top:12px; padding-bottom:8px; }
+html[data-short="true"] .np .np-cover { width:80px; height:80px; margin-bottom:4px; }
+html[data-short="true"] .np .iconbtn { min-width:48px; width:48px; height:48px; min-height:48px; }
+html[data-short="true"] .np .np-ctl svg { width:26px; height:26px; }
+html[data-short="true"] .np-collapse { height:40px; min-height:40px; margin-top:4px; }
+html[data-short="true"] .np-volume { padding-bottom:0; }
+.np { overflow-y:auto; }
+.np.split { grid-template-columns:min(var(--splitw,440px),62%) minmax(0,1fr); }
+html[data-wide="false"] .np.split { grid-template-columns:1fr; }

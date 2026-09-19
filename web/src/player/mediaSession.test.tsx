@@ -18,6 +18,11 @@ let starts: Array<{ src: string; cover: string | undefined }>
 let media: { metadata: MediaMetadata | null; playbackState: string; setActionHandler: ReturnType<typeof vi.fn>; setPositionState: ReturnType<typeof vi.fn> }
 
 beforeEach(() => {
+  vi.stubGlobal('Image', function () {
+    const image = { naturalWidth: 512, naturalHeight: 512, onload: null as (() => void) | null, onerror: null }
+    Object.defineProperty(image, 'src', { set() { image.onload?.() } })
+    return image
+  })
   localStorage.clear()
   elements = []; starts = []
   media = { metadata: null, playbackState: 'none', setActionHandler: vi.fn(), setPositionState: vi.fn() }
@@ -103,7 +108,7 @@ it('publishes the new cover before normal and preloaded playback, then republish
   const callsBefore = callsForSecond()
   await act(async () => player.next())
   expect(callsForSecond()).toBe(callsBefore)
-  expect(starts.at(-1)).toEqual({ src: 'https://audio.test/2.mp3', cover: 'https://cover.test/2.jpg?param=128y128' })
+  expect(starts.at(-1)).toEqual({ src: 'https://audio.test/2.mp3', cover: 'https://cover.test/2.jpg?param=512y512' })
 
   media.metadata = null
   await act(async () => elements[0].dispatchEvent(new Event('playing')))

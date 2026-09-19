@@ -3,6 +3,8 @@ import { nextIndex, prevIndex, buildShuffleOrder, type Repeat } from './queue'
 import { getSongUrl, getLyric, getPersonalFm, getLikedIds, setLike, getLoginStatus, type Song } from '../api'
 import { useAudio } from './useAudio'
 import { diagnostic, mediaFingerprint } from './diagnostics'
+import type { ReplayGain } from './normalization'
+import { createArtworkPublisher } from './mediaArtwork'
 import { requestWakeLock } from './wakeLock'
 import { loadPersisted, savePersisted } from './persist'
 import { toast } from '../ui/toast'
@@ -127,6 +129,7 @@ export function playerReducer(s: PlayerState, a: Action): PlayerState {
 }
 
 interface PlayerValue extends PlayerState {
+  normalize: boolean; setNormalize: (value: boolean) => void
   current: Song | null; volume: number
   queueSongs: Song[]
   playList: (songs: Song[], start: number) => void
@@ -218,28 +221,22 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [current, state.pos, state.playToken, state.isPlaying, state.order.length, state.repeat])
   // Media Session 元数据:封面 + 歌名。车机媒体卡片副标题被浏览器占用来显示页面 URL、
   // 不渲染 artist 字段,所以把歌手并进标题行,保证车机上能看到歌手名。
-  const syncMediaMetadata = useCallback(() => {
-    if (!('mediaSession' in navigator)) { diagnostic('metadata.unsupported'); return }
-    const ms = navigator.mediaSession
-    if (!current) { ms.metadata = null; document.title = 'TeslaNetEaseMusic'; return }
-    const cover = current.cover
-    const title = current.artist ? `${current.name} · ${current.artist}` : current.name
-    try {
-      ms.metadata = new MediaMetadata({
-        title,
-        artist: current.artist,
-        album: current.artist, // 冗余兜底:部分车机副标题取 album
-        artwork: cover
-          ? [128, 256, 512].map((s) => ({ src: `${cover}?param=${s}y${s}`, sizes: `${s}x${s}`, type: 'image/jpeg' }))
-          : [],
-      })
-      diagnostic('metadata.set', { song: current.id, cover: mediaFingerprint(cover), submitted: mediaFingerprint(ms.metadata?.artwork[0]?.src ?? '') })
-    } catch { diagnostic('metadata.failed', { song: current.id }) }
-    document.title = `${current.name} - ${current.artist}`
+  const artworkPublisher = useRef<ReturnType<typeof createArtworkPublisher> | null>(null)
+  const syncMediaMetadata = useCallback(() => artworkPublisher.current?.sync(), [])
+  // Install the publisher before the track load effect. Cleanup cancels both
+  // pending image results and delayed platform refreshes when the track changes.
+  useEffect(() => {
+    if (!current) {
+      if ('mediaSession' in navigator) navigator.mediaSession.metadata = null
+      document.title = 'TeslaNetEaseMusic'
+      artworkPublisher.current = null
+      return
+    }
+    const publisher = createArtworkPublisher(current)
+    artworkPublisher.current = publisher
+    publisher.sync()
+    return () => { publisher.dispose(); artworkPublisher.current = null }
   }, [current])
-
-  // 先发布新曲信息，再进入下方加载/预载切换 effect，避免起播读取上一首封面。
-  useEffect(syncMediaMetadata, [syncMediaMetadata])
   const handlePlayRejected = useCallback((error: unknown) => {
     const name = error && typeof error === 'object' && 'name' in error ? String(error.name) : 'UnknownError'
     // 不再吞掉起播失败并保持“播放中”，否则系统播放键也无法重新启动。
@@ -247,10 +244,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     toast(name === 'NotAllowedError' ? '浏览器阻止了自动播放，请点播放继续' : '播放启动失败，请点播放重试')
     console.warn('[player] play rejected', { name, visibility: document.visibilityState })
   }, [])
-  const { load, play, pause, seek, setVolume, preload, swapToPreloaded, reloadFrom, currentMs, durationMs, bufferedMs, stalled, stallSeq, volume } = useAudio(handleEnded, handleError, boot?.volume ?? 1, syncMediaMetadata, handlePlayRejected)
+  const { normalize, setNormalize, load, play, pause, seek, setVolume, preload, swapToPreloaded, reloadFrom, currentMs, durationMs, bufferedMs, stalled, stallSeq, volume } = useAudio(handleEnded, handleError, boot?.volume ?? 1, syncMediaMetadata, handlePlayRejected)
   playedRef.current = currentMs
   pauseRef.current = pause
   const seekRef = useRef(seek); seekRef.current = seek
+  const normRef = useRef(setNormalize); normRef.current = setNormalize
+  const setNormalizeStable = useCallback((v: boolean) => normRef.current(v), [])
   const setVolRef = useRef(setVolume); setVolRef.current = setVolume
   const reloadFromRef = useRef(reloadFrom); reloadFromRef.current = reloadFrom
   const seekStable = useCallback((ms: number) => seekRef.current(ms), [])
@@ -270,7 +269,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const pos = playedRef.current
     interruptedRef.current = null; setNetInterrupted(false); stallCountRef.current = 0 // 换档重新观察,别带着切档前的卡顿计数
     getSongUrl(id, effectiveLevel()).then((r) => {
-      if (r.url) { curUrlRef.current = r.url; reloadFromRef.current(r.url, pos, isPlayingRef.current) } // 暂停时换音质不自动播
+      if (id !== curIdRef.current) return
+      if (r.url) { curUrlRef.current = r.url; reloadFromRef.current(r.url, pos, isPlayingRef.current, r) } // 暂停时换音质不自动播
     }).catch(() => {})
   }, [])
   // 手动开关省流(UI 用):写 localStorage、跨重启保留,并清掉"自动"标记(手动优先)
@@ -318,13 +318,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       // 取地址:当前音质取不到音源(url=null,如网易缺该档无损/Hi-Res 源)时,自动逐级降档找有源的,别直接判"放不出"
       const want = effectiveLevel()
       let url: string | null = null
+      let gain: ReplayGain | undefined
       let usedLevel = want
       try {
         for (const lv of levelsAtOrBelow(want)) {
           const r = await getSongUrl(current.id, lv)
           diagnostic('track.url', { song: current.id, level: lv, available: !!r.url, cancelled })
           if (cancelled) return
-          if (r.url) { url = r.url; usedLevel = lv; break }
+          if (r.url) { url = r.url; gain = r; usedLevel = lv; break }
         }
       } catch {
         diagnostic('track.url-failed', { song: current.id, cancelled })
@@ -338,7 +339,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         loadedOkRef.current = true
         skipRef.current = 0
         if (usedLevel !== want) toast(`这首无「${qualityName(want)}」音源,已用${qualityName(usedLevel)}播放`) // 降档告知
-        load(url)
+        load(url, gain)
         if (isPlayingRef.current) { requestWakeLock(); play().catch(() => {}) }
       } else {
         // 降到最低档仍拿不到地址 → 这首真放不出,跳过
@@ -427,7 +428,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     getSongUrl(nextSong.id, effectiveLevel()).then((r) => {
       if (!r.url) return
       preloadedRef.current = { id: nextSong.id, url: r.url }
-      preload(r.url) // 用备用元素缓冲下一首的字节
+      preload(r.url, r) // 用备用元素缓冲下一首的字节
     }).catch(() => {})
   }, [currentMs, durationMs, state.isPlaying, state.playToken, state.pos, state.order, state.queue, state.repeat]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -490,7 +491,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const progress = useMemo(() => ({ currentMs, durationMs, bufferedMs, stalled, netInterrupted }), [currentMs, durationMs, bufferedMs, stalled, netInterrupted])
   // value 不含 currentMs/durationMs,依赖项在进度 tick 时都不变 → 引用稳定,usePlayer 消费方不会每秒重渲染 4 次
   const value = useMemo<PlayerValue>(() => ({
-    ...state, current, volume, queueSongs, quality, setQuality, lowData, setLowData,
+    ...state, normalize, setNormalize: setNormalizeStable, current, volume, queueSongs, quality, setQuality, lowData, setLowData,
     isLiked, toggleLike,
     jumpTo: (pos) => dispatch({ type: 'jumpTo', pos }),
     removeAt: (pos) => dispatch({ type: 'removeAt', pos }),
@@ -504,7 +505,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     seek: seekStable, setVolume: setVolumeStable,
     setShuffle: (on) => dispatch({ type: 'setShuffle', on }),
     cycleRepeat: () => dispatch({ type: 'cycleRepeat' }),
-  }), [state, current, volume, queueSongs, quality, setQuality, lowData, setLowData, isLiked, toggleLike, seekStable, setVolumeStable])
+  }), [state, normalize, setNormalizeStable, current, volume, queueSongs, quality, setQuality, lowData, setLowData, isLiked, toggleLike, seekStable, setVolumeStable])
 
   return (
     <Ctx.Provider value={value}>

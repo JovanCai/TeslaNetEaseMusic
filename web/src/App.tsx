@@ -49,7 +49,7 @@ export default function App() {
   function goTab(t: string) { setAlbumId(null); setArtistId(null); setPlaylist(null); setTab(t) } // 切换标签时离开详情页
 
   if (authed === null) return <div className="shell" />
-  if (!authed) return <Login onDone={() => setAuthed(true)} />
+  if (!authed) return <><Login onDone={() => setAuthed(true)} /><ThemePicker /></>
 
   return (
     <div className="shell">

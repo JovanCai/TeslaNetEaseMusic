@@ -120,3 +120,14 @@ describe('getPlaylistTracks 分页', () => {
     expect(f.mock.calls[1][0]).toContain('offset=1000')  // 第二页用 offset 翻页
   })
 })
+
+describe('song loudness metadata', () => {
+  it('preserves finite gain and peak alongside the HTTPS source', async () => {
+    vi.stubGlobal('fetch', mockFetch({ data: [{ url: 'http://audio.test/song.mp3', gain: -7.5, peak: 0.98 }] }))
+    expect(await getSongUrl(1)).toEqual({ id: 1, url: 'https://audio.test/song.mp3', gain: -7.5, peak: 0.98 })
+  })
+  it('does not coerce absent or string metadata into loudness values', async () => {
+    vi.stubGlobal('fetch', mockFetch({ data: [{ url: null, gain: null, peak: 'bad' }] }))
+    expect(await getSongUrl(1)).toEqual({ id: 1, url: null })
+  })
+})

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { loadNormalization, normalizationFactor, type ReplayGain } from './normalization'
 import { diagnostic, diagnosticSnapshot, mediaFingerprint } from './diagnostics'
 
 export function useAudio(onEnded?: (posMs: number, durMs: number) => void, onError?: (e: MediaError | null) => void, initialVolume = 1, onPlaybackStarted?: () => void, onPlayRejected?: (error: unknown) => void) {
@@ -8,6 +9,10 @@ export function useAudio(onEnded?: (posMs: number, durMs: number) => void, onErr
   const [stalled, setStalled] = useState(false)   // 缓冲中(buffer 见底、等数据),含起播/换流的加载态
   const [stallSeq, setStallSeq] = useState(0)     // "播放中断流"计数:只统计已放出声之后的 waiting(起播/换音质/seek 的蓄流不算),给弱网降档判断用
   const [volume, setVolumeState] = useState(initialVolume)
+  const [normalize, setNormalizeState] = useState(loadNormalization)
+  const normalizeRef = useRef(normalize)
+  const volumeRef = useRef(initialVolume)
+  const factors = useRef([1, 1])
   const cb = useRef({ onEnded, onError, onPlaybackStarted, onPlayRejected })
   cb.current = { onEnded, onError, onPlaybackStarted, onPlayRejected }
   const resumeRef = useRef<{ ms: number; play: boolean } | null>(null) // reloadFrom 后待 seek 回的位置(ms)与是否自动播
@@ -102,6 +107,8 @@ export function useAudio(onEnded?: (posMs: number, durMs: number) => void, onErr
         spareUrlRef.current = ''
         resumeRef.current = null
         playedOnceRef.current = false
+        factors.current[previous] = factors.current[index]
+        applyVolumes()
         cur().src = src
         setCurrentMs(0); setBufferedMs(0); setStalled(true)
         setActiveIdx(previous)
@@ -111,14 +118,20 @@ export function useAudio(onEnded?: (posMs: number, durMs: number) => void, onErr
       if (name !== 'AbortError') { setStalled(false); cb.current.onPlayRejected?.(error) }
     }
   }
-  function load(url: string) { const a = cur(); if (a.src !== url) { ++playRequestRef.current; resumeRef.current = null; a.src = url; setBufferedMs(0); setCurrentMs(0); setStalled(false); playedOnceRef.current = false } }
+  function load(url: string, gain?: ReplayGain) { factors.current[activeIdxRef.current] = normalizationFactor(gain); applyVolumes(); const a = cur(); if (a.src !== url) { ++playRequestRef.current; resumeRef.current = null; a.src = url; setBufferedMs(0); setCurrentMs(0); setStalled(false); playedOnceRef.current = false } }
   function play() { return startPlayback() }
   function pause() { ++playRequestRef.current; if (resumeRef.current) resumeRef.current.play = false; cur().pause() }
   function seek(ms: number) { cur().currentTime = ms / 1000 }
-  function setVolume(v: number) { pair.forEach((a) => { a.volume = v }); setVolumeState(v) }
-  function preload(url: string) { const s = spare(); if (spareUrlRef.current !== url) { s.preload = 'auto'; s.src = url; spareUrlRef.current = url } }
+  function applyVolumes() { pair.forEach((a, i) => { a.volume = volumeRef.current * (normalizeRef.current ? factors.current[i] : 1) }) }
+  function setVolume(v: number) { volumeRef.current = Math.max(0, Math.min(1, v)); applyVolumes(); setVolumeState(volumeRef.current) }
+  function setNormalize(value: boolean) {
+    normalizeRef.current = value; setNormalizeState(value); applyVolumes()
+    try { localStorage.setItem('tm.normalize', value ? '1' : '0') } catch { /* session-only */ }
+    diagnostic('volume.normalization', { enabled: value, factor: factors.current[activeIdxRef.current] })
+  }
+  function preload(url: string, gain?: ReplayGain) { factors.current[1 - activeIdxRef.current] = normalizationFactor(gain); applyVolumes(); const s = spare(); if (spareUrlRef.current !== url) { s.preload = 'auto'; s.src = url; spareUrlRef.current = url } }
   // 断点重载:重新加载地址,元数据就绪后 seek 回 ms;play=false 时只加载不自动播(暂停中换音质用)
-  function reloadFrom(url: string, ms: number, play = true) { ++playRequestRef.current; resumeRef.current = { ms, play }; playedOnceRef.current = false; const a = cur(); setStalled(true); a.src = url; a.load() }
+  function reloadFrom(url: string, ms: number, play = true, gain?: ReplayGain) { if (gain) { factors.current[activeIdxRef.current] = normalizationFactor(gain); applyVolumes() } ++playRequestRef.current; resumeRef.current = { ms, play }; playedOnceRef.current = false; const a = cur(); setStalled(true); a.src = url; a.load() }
   // 切到已预载的备用元素(已缓冲下一首)。备用地址不匹配则返回 false,让调用方走普通加载。
   function swapToPreloaded(url: string): boolean {
     diagnostic('audio.swap', { matched: spareUrlRef.current === url, from: activeIdxRef.current })
@@ -132,5 +145,5 @@ export function useAudio(onEnded?: (posMs: number, durMs: number) => void, onErr
     setActiveIdx(activeIdxRef.current)
     return true
   }
-  return { load, play, pause, seek, setVolume, preload, swapToPreloaded, reloadFrom, currentMs, durationMs, bufferedMs, stalled, stallSeq, volume }
+  return { normalize, setNormalize, load, play, pause, seek, setVolume, preload, swapToPreloaded, reloadFrom, currentMs, durationMs, bufferedMs, stalled, stallSeq, volume }
 }

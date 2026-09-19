@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import { THEMES, AUTO, systemScheme, loadThemePref, setThemePref, applyResolvedTheme, ensureSunTimes } from '../ui/themes'
+import { DISPLAY_SCALES, loadDisplayScale, setDisplayScale } from '../ui/displayScale'
+import { usePlayer } from '../player/PlayerContext'
 import { Icon } from './Icon'
 
 export function ThemePicker() {
+  const player = usePlayer()
+  const [scale, setScale] = useState(loadDisplayScale)
   const [open, setOpen] = useState(false)
   const [pref, setPref] = useState(loadThemePref())
 
@@ -37,13 +41,32 @@ export function ThemePicker() {
 
   return (
     <>
-      <button className="theme-btn tap" onClick={() => setOpen((o) => !o)} aria-label="主题">
+      <button className="theme-btn tap" onClick={() => setOpen((o) => !o)} aria-label="主题与界面大小">
         <Icon name="palette" size={24} />
       </button>
       {open && (
         <>
           <div className="theme-mask" onClick={() => setOpen(false)} />
           <div className="theme-pop glass">
+            <div className="display-size">
+              <strong>界面大小</strong>
+              <div className="display-options">
+                {DISPLAY_SCALES.map(value => (
+                  <button key={value} className="tap" aria-pressed={scale === value}
+                    onClick={() => { setDisplayScale(value); setScale(value) }}>
+                    {Math.round(value * 100)}%
+                  </button>
+                ))}
+              </div>
+              <small>车机显示过大时调小；100% 恢复默认</small>
+            </div>
+            <div className="display-size">
+              <button className="normalize-toggle tap" aria-pressed={player.normalize}
+                onClick={() => player.setNormalize(!player.normalize)}>
+                音量平衡：{player.normalize ? '开' : '关'}
+              </button>
+              <small>降低过响歌曲的音量；无响度数据时保持原音量</small>
+            </div>
             <div className={`theme-row tap ${pref === AUTO ? 'on' : ''}`} onClick={() => pick(AUTO)}>
               <span className="theme-swatch theme-swatch-auto" />
               <span className="theme-name">自动 · 跟随车机昼夜</span>
