@@ -17,18 +17,18 @@ beforeEach(() => {
   })
 })
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals() })
-it('clears old artwork, waits for image success and retries once', () => {
+it('submits new artwork immediately without waiting for image loading', () => {
   const publisher = createArtworkPublisher(song(1))
   publisher.sync()
   expect(media.metadata?.title).toBe('Song 1 · Artist')
-  expect(media.metadata?.artwork).toEqual([])
+  expect(media.metadata?.artwork[0].src).toContain('/1.jpg')
   expect(images[0].src).toBe('https://cover.test/1.jpg?existing=1&param=512y512')
   publisher.sync() // playing before the image is ready
   expect(images).toHaveLength(1)
   images[0].dispatchEvent(new Event('load'))
   expect((media.metadata as MediaMetadata | null)?.artwork[0].src).toBe(images[0].src)
   media.metadata = null
-  vi.advanceTimersByTime(1000)
+  vi.advanceTimersByTime(5000)
   expect((media.metadata as MediaMetadata | null)?.artwork[0].src).toBe(images[0].src)
   expect(vi.getTimerCount()).toBe(0)
   publisher.dispose()
@@ -51,7 +51,7 @@ it('ignores late image callbacks and cancels retries after a track change', () =
   next.sync()
   lateLoad.call(images[0], new Event('load'))
   expect(media.metadata?.title).toBe('Song 2 · Artist')
-  expect(media.metadata?.artwork).toEqual([])
+  expect(media.metadata?.artwork[0].src).toContain('/2.jpg')
   images[1].dispatchEvent(new Event('load'))
   next.dispose()
   media.metadata = null
@@ -59,12 +59,34 @@ it('ignores late image callbacks and cancels retries after a track change', () =
   expect(media.metadata).toBeNull()
   expect(vi.getTimerCount()).toBe(0)
 })
-it('bounds stalled image requests and leaves no stale artwork on failure', () => {
+it('keeps the current artwork URL submitted even if both probes time out', () => {
   const publisher = createArtworkPublisher(song(1))
   publisher.sync()
-  vi.advanceTimersByTime(16000)
+  vi.advanceTimersByTime(20000)
   expect(images).toHaveLength(2)
-  expect(media.metadata?.artwork).toEqual([])
+  expect(media.metadata?.artwork[0].src).toBe('https://cover.test/1.jpg?existing=1&param=128y128')
   expect(vi.getTimerCount()).toBe(0)
   publisher.dispose()
+})
+
+it('defers repeated playing updates and restores metadata on returning to the page', () => {
+  const publisher = createArtworkPublisher(song(1))
+  publisher.sync()
+  const initial = media.metadata
+  images[0].dispatchEvent(new Event('load'))
+  publisher.sync()
+  expect(media.metadata).toBe(initial)
+  vi.advanceTimersByTime(4999)
+  expect(media.metadata).toBe(initial)
+  vi.advanceTimersByTime(1)
+  expect(media.metadata).not.toBe(initial)
+  media.metadata = null
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+  document.dispatchEvent(new Event('visibilitychange'))
+  expect((media.metadata as MediaMetadata | null)?.artwork[0].src).toContain('/1.jpg')
+  publisher.dispose()
+  media.metadata = null
+  document.dispatchEvent(new Event('visibilitychange'))
+  expect(media.metadata).toBeNull()
+  vi.restoreAllMocks()
 })

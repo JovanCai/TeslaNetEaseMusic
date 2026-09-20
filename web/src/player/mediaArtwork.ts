@@ -1,7 +1,7 @@
 import { diagnostic, mediaFingerprint } from './diagnostics'
 
-// Image loading and platform artwork updates happen asynchronously. Keep a
-// publisher per track so a late image result cannot restore the previous cover.
+// A page image probe is not an acknowledgement from the system media card.
+// Always give the browser the new artwork immediately, including in background.
 export function createArtworkPublisher(song: { id: number; name: string; artist: string; cover: string }) {
   let disposed = false
   let started = false
@@ -17,6 +17,15 @@ export function createArtworkPublisher(song: { id: number; name: string; artist:
       diagnostic('metadata.set', { song: song.id, reason, cover: mediaFingerprint(song.cover), submitted: mediaFingerprint(artwork[0]?.src ?? '') })
     } catch { diagnostic('metadata.failed', { song: song.id, reason }) }
   }
+  const scheduleRetry = () => {
+    clearTimeout(retry)
+    // Leave the browser time to download artwork. Reassigning metadata on every
+    // immediate playing/image event can cancel an in-flight native image fetch.
+    retry = setTimeout(() => publish('artwork-retry'), 5000)
+  }
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') { publish('visible'); scheduleRetry() }
+  }
   const load = (url: string, fallback?: string) => {
     image = new Image()
     const candidate = image
@@ -27,11 +36,15 @@ export function createArtworkPublisher(song: { id: number; name: string; artist:
       clearTimeout(timeout)
       candidate.onload = candidate.onerror = null
       diagnostic(ok ? 'artwork.loaded' : 'artwork.failed', { song: song.id, source: mediaFingerprint(url), width: candidate.naturalWidth, height: candidate.naturalHeight })
-      if (!ok) { if (fallback) load(fallback); return }
-      artwork = [{ src: url, sizes: `${candidate.naturalWidth}x${candidate.naturalHeight}` }]
-      publish('artwork-ready')
-      // A bounded retry gives the platform time to adopt the new audio element.
-      retry = setTimeout(() => publish('artwork-retry'), 1000)
+      if (!ok && fallback) {
+        // Keep a real URL submitted even if neither page probe completes.
+        artwork = [{ src: fallback }]
+        publish('artwork-fallback')
+        load(fallback)
+        scheduleRetry()
+      }
+      // Success needs no immediate re-publication: the system already has this
+      // URL. Failure must not erase it or gate the browser's own image request.
     }
     candidate.onload = () => finish(candidate.naturalWidth > 0 && candidate.naturalHeight > 0)
     candidate.onerror = () => finish(false)
@@ -42,22 +55,28 @@ export function createArtworkPublisher(song: { id: number; name: string; artist:
     sync() {
       if (disposed) return
       document.title = `${song.name} - ${song.artist}`
-      if (started) { publish('playing'); return }
+      if (started) { scheduleRetry(); return }
       started = true
-      // Publish the new title without artwork first, explicitly removing old art.
+      let probe: { url: string; fallback?: string } | undefined
+      if (song.cover) {
+        try {
+          const original = new URL(song.cover, document.baseURI)
+          if (original.protocol === 'http:') original.protocol = 'https:'
+          const resized = new URL(original.href)
+          resized.searchParams.set('param', '512y512')
+          artwork = [{ src: resized.href }]
+          probe = { url: resized.href, fallback: resized.href !== original.href ? original.href : undefined }
+        } catch { diagnostic('artwork.invalid', { song: song.id }) }
+      }
       publish('track-change')
-      if (!song.cover || !('mediaSession' in navigator)) return
-      try {
-        const original = new URL(song.cover, document.baseURI)
-        if (original.protocol === 'http:') original.protocol = 'https:'
-        const resized = new URL(original.href)
-        resized.searchParams.set('param', '512y512')
-        load(resized.href, resized.href !== original.href ? original.href : undefined)
-      } catch { diagnostic('artwork.invalid', { song: song.id }) }
+      document.addEventListener('visibilitychange', onVisible)
+      scheduleRetry()
+      if (probe && 'mediaSession' in navigator) load(probe.url, probe.fallback)
     },
     dispose() {
       disposed = true
       clearTimeout(timeout); clearTimeout(retry)
+      document.removeEventListener('visibilitychange', onVisible)
       if (image) image.onload = image.onerror = null
     },
   }

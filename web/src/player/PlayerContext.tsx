@@ -159,7 +159,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   queueLenRef.current = state.queue.length
   const skipRef = useRef(0)
   const loadedOkRef = useRef(true) // 当前曲是否成功拿到可播地址;false 时按播放会自动跳过
-  const preloadedRef = useRef<{ id: number; url: string } | null>(null) // 已预取并缓冲的下一首
+  const preloadedRef = useRef<{ id: number; url: string; gain: ReplayGain; level: string } | null>(null) // 仅预取地址，不创建第二个媒体元素
   const preloadTokenRef = useRef(-1) // 保证每首只预载一次
   const playedRef = useRef(0)        // 当前曲已播到的位置(ms)
   const curUrlRef = useRef('')       // 当前曲已加载的地址(断网续播时重载用)
@@ -244,7 +244,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     toast(name === 'NotAllowedError' ? '浏览器阻止了自动播放，请点播放继续' : '播放启动失败，请点播放重试')
     console.warn('[player] play rejected', { name, visibility: document.visibilityState })
   }, [])
-  const { normalize, setNormalize, load, play, pause, seek, setVolume, preload, swapToPreloaded, reloadFrom, currentMs, durationMs, bufferedMs, stalled, stallSeq, volume } = useAudio(handleEnded, handleError, boot?.volume ?? 1, syncMediaMetadata, handlePlayRejected)
+  const { normalize, setNormalize, load, play, pause, seek, setVolume, reloadFrom, currentMs, durationMs, bufferedMs, stalled, stallSeq, volume } = useAudio(handleEnded, handleError, boot?.volume ?? 1, syncMediaMetadata, handlePlayRejected)
   playedRef.current = currentMs
   pauseRef.current = pause
   const seekRef = useRef(seek); seekRef.current = seek
@@ -302,9 +302,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     interruptedRef.current = null; setNetInterrupted(false); playedRef.current = 0; stallCountRef.current = 0; curIdRef.current = current.id // 换曲:清掉上一首的断网/卡顿状态
     let cancelled = false
     ;(async () => {
-      // 下一首已预载并缓冲在备用元素:直接切过去,复用字节、不重新下载
+      // 复用预取的地址，但始终在原音频元素上播放，避免后台启用第二个元素。
       const pre = preloadedRef.current
-      if (pre && pre.id === current.id && swapToPreloaded(pre.url)) {
+      if (pre && pre.id === current.id && pre.level === effectiveLevel()) {
+        load(pre.url, pre.gain)
         preloadedRef.current = null
         curUrlRef.current = pre.url
         loadedOkRef.current = true
@@ -414,8 +415,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       .finally(() => { fetchingRef.current = false })
   }, [state.radar, state.pos, state.order.length])
 
-  // 弱网韧性:当前曲播放几秒后,预取下一首地址并用备用元素缓冲字节。切歌/曲终时直接切到备用元素
-  // (复用缓冲、不重新下载),更快更不易卡。单曲循环/无下一首不预载。
+  // 提前取下一首地址，减少后台续播的请求等待；不预载第二个音频元素。
   useEffect(() => {
     if (!state.isPlaying || durationMs <= 0) return
     if (preloadTokenRef.current === state.playToken) return // 每首只预载一次
@@ -425,10 +425,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (np < 0 || np === state.pos) return // 无下一首 / 单曲循环
     const nextSong = state.queue[state.order[np]]
     if (!nextSong || preloadedRef.current?.id === nextSong.id) return
-    getSongUrl(nextSong.id, effectiveLevel()).then((r) => {
-      if (!r.url) return
-      preloadedRef.current = { id: nextSong.id, url: r.url }
-      preload(r.url, r) // 用备用元素缓冲下一首的字节
+    const token = state.playToken, level = effectiveLevel()
+    getSongUrl(nextSong.id, level).then((r) => {
+      if (!r.url || preloadTokenRef.current !== token || curIdRef.current !== current?.id) return
+      preloadedRef.current = { id: nextSong.id, url: r.url, gain: r, level }
     }).catch(() => {})
   }, [currentMs, durationMs, state.isPlaying, state.playToken, state.pos, state.order, state.queue, state.repeat]) // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -12,138 +12,96 @@ export function useAudio(onEnded?: (posMs: number, durMs: number) => void, onErr
   const [normalize, setNormalizeState] = useState(loadNormalization)
   const normalizeRef = useRef(normalize)
   const volumeRef = useRef(initialVolume)
-  const factors = useRef([1, 1])
+  const factor = useRef(1)
   const cb = useRef({ onEnded, onError, onPlaybackStarted, onPlayRejected })
   cb.current = { onEnded, onError, onPlaybackStarted, onPlayRejected }
   const resumeRef = useRef<{ ms: number; play: boolean } | null>(null) // reloadFrom 后待 seek 回的位置(ms)与是否自动播
   const playedOnceRef = useRef(false) // 当前流是否已真正放出过声;换流(load/reloadFrom/切歌)重置。起播蓄流的卡顿不算网络差
 
-  // 两个元素乒乓:一个在播,另一个预载下一首。切歌时交换,直接用已缓冲的字节,不重新下载。
-  const [pair] = useState<[HTMLAudioElement, HTMLAudioElement]>(() => {
-    const a = new Audio(), b = new Audio()
-    a.volume = b.volume = initialVolume
-    return [a, b]
+  // 持续复用同一个原生音频元素，保留车机媒体会话与用户授予的播放权限。
+  const [audio] = useState(() => {
+    const a = new Audio()
+    a.volume = initialVolume
+    a.preload = 'auto'
+    return a
   })
-  const activeIdxRef = useRef(0)
-  const lastPlayedIdxRef = useRef<number | null>(null)
   const playRequestRef = useRef(0)
-  const spareUrlRef = useRef('') // 备用元素当前预载的地址
-  const [activeIdx, setActiveIdx] = useState(0) // 变化时同步新活动元素的进度与缓冲
-  const cur = () => pair[activeIdxRef.current]
-  const spare = () => pair[1 - activeIdxRef.current]
-  const audioSnapshot = (a: HTMLAudioElement, index: number) => ({ element: index, active: index === activeIdxRef.current, source: mediaFingerprint(a.currentSrc || a.src), seconds: Number.isFinite(a.currentTime) ? Math.round(a.currentTime) : -1, duration: Number.isFinite(a.duration) ? Math.round(a.duration) : -1, paused: a.paused, ended: a.ended, ready: a.readyState, network: a.networkState, error: a.error?.code ?? 0 })
+  const audioSnapshot = () => ({ element: 0, active: true, source: mediaFingerprint(audio.currentSrc || audio.src), seconds: Number.isFinite(audio.currentTime) ? Math.round(audio.currentTime) : -1, duration: Number.isFinite(audio.duration) ? Math.round(audio.duration) : -1, paused: audio.paused, ended: audio.ended, ready: audio.readyState, network: audio.networkState, error: audio.error?.code ?? 0 })
   useEffect(() => {
-    const report = () => pair.forEach((a, index) => diagnostic('audio.snapshot', audioSnapshot(a, index)))
+    const report = () => diagnostic('audio.snapshot', audioSnapshot())
     window.addEventListener('tm-diagnostic-snapshot', report)
     document.addEventListener('visibilitychange', report)
     return () => { window.removeEventListener('tm-diagnostic-snapshot', report); document.removeEventListener('visibilitychange', report) }
-  }, [pair])
+  }, [audio])
 
-  // 永久监听两个元素并过滤备用元素，交换后不依赖 React 重绑事件才能继续播放。
+  // 监听始终绑定在同一个元素上。
   useEffect(() => {
-    const cleanups = pair.map((a, index) => {
-      const readBuffered = () => setBufferedMs(a.buffered.length ? a.buffered.end(a.buffered.length - 1) * 1000 : 0)
-      const onTime = () => { setCurrentMs(a.currentTime * 1000); readBuffered() }
-      const onMeta = () => {
-        setDurationMs((a.duration || 0) * 1000)
-        const r = resumeRef.current
-        if (r != null) { // reloadFrom:元数据就绪后 seek 回断点,按需续播
-          resumeRef.current = null
-          try { a.currentTime = r.ms / 1000 } catch { /* 忽略 */ }
-          if (r.play) startPlayback().catch(() => {})
-        }
+    const a = audio
+    const readBuffered = () => setBufferedMs(a.buffered.length ? a.buffered.end(a.buffered.length - 1) * 1000 : 0)
+    const onTime = () => { setCurrentMs(a.currentTime * 1000); readBuffered() }
+    const onMeta = () => {
+      setDurationMs((a.duration || 0) * 1000)
+      const r = resumeRef.current
+      if (r != null) { // reloadFrom:元数据就绪后 seek 回断点,按需续播
+        resumeRef.current = null
+        try { a.currentTime = r.ms / 1000 } catch { /* 忽略 */ }
+        if (r.play) startPlayback().catch(() => {})
       }
-      const onProgress = () => readBuffered()
-      // 只有"已放出声之后"再等数据才算网络扛不住当前码率;起播/换音质/seek 的蓄流不计入降档
-      const onWaiting = () => { setStalled(true); if (playedOnceRef.current) setStallSeq((n) => n + 1) }
-      const onPlaying = () => { setStalled(false); playedOnceRef.current = true; lastPlayedIdxRef.current = index; cb.current.onPlaybackStarted?.() }
-      const onEnd = () => cb.current.onEnded?.(a.currentTime * 1000, a.duration * 1000) // 读实时位置,后台 timeupdate 被节流也准
-      const onErr = () => cb.current.onError?.(a.error) // 播放/解码/网络失败:交给上层处理
-      let lastTick = 0
-      const handlers: Record<string, () => void> = { timeupdate: onTime, loadedmetadata: onMeta, progress: onProgress, waiting: onWaiting, stalled: onWaiting, playing: onPlaying, ended: onEnd, error: onErr, pause: () => {}, play: () => {}, canplay: () => {}, emptied: () => {} }
-      const listeners = Object.entries(handlers).map(([event, handler]) => {
-        const listener = () => {
-          if (diagnosticSnapshot().enabled && event !== 'progress' && (event !== 'timeupdate' || Date.now() - lastTick >= 10000)) {
-            if (event === 'timeupdate') lastTick = Date.now()
-            diagnostic(`audio.${event}`, audioSnapshot(a, index))
-          }
-          if (index === activeIdxRef.current) handler()
+    }
+    const onProgress = () => readBuffered()
+    // 只有"已放出声之后"再等数据才算网络扛不住当前码率;起播/换音质/seek 的蓄流不计入降档
+    const onWaiting = () => { setStalled(true); if (playedOnceRef.current) setStallSeq((n) => n + 1) }
+    const onPlaying = () => { setStalled(false); playedOnceRef.current = true; cb.current.onPlaybackStarted?.() }
+    const onEnd = () => cb.current.onEnded?.(a.currentTime * 1000, a.duration * 1000) // 读实时位置,后台 timeupdate 被节流也准
+    const onErr = () => cb.current.onError?.(a.error) // 播放/解码/网络失败:交给上层处理
+    let lastTick = 0
+    const handlers: Record<string, () => void> = { timeupdate: onTime, loadedmetadata: onMeta, progress: onProgress, waiting: onWaiting, stalled: onWaiting, playing: onPlaying, ended: onEnd, error: onErr, pause: () => {}, play: () => {}, canplay: () => {}, emptied: () => {} }
+    const listeners = Object.entries(handlers).map(([event, handler]) => {
+      const listener = () => {
+        if (diagnosticSnapshot().enabled && event !== 'progress' && (event !== 'timeupdate' || Date.now() - lastTick >= 10000)) {
+          if (event === 'timeupdate') lastTick = Date.now()
+          diagnostic(`audio.${event}`, audioSnapshot())
         }
-        a.addEventListener(event, listener)
-        return () => a.removeEventListener(event, listener)
-      })
-      return () => {
-        listeners.forEach((remove) => remove())
+        handler()
       }
+      a.addEventListener(event, listener)
+      return () => a.removeEventListener(event, listener)
     })
-    return () => { ++playRequestRef.current; cleanups.forEach((remove) => remove()) }
-  }, [pair])
+    return () => {
+      ++playRequestRef.current
+      listeners.forEach((remove) => remove())
+      a.pause()
+    }
+  }, [audio])
 
-  useEffect(() => {
-    const a = pair[activeIdx]
-    setCurrentMs(a.currentTime * 1000); setDurationMs((a.duration || 0) * 1000)
-    setBufferedMs(a.buffered.length ? a.buffered.end(a.buffered.length - 1) * 1000 : 0)
-  }, [pair, activeIdx])
-
-  async function startPlayback(allowFallback = true): Promise<void> {
-    const a = cur(), index = activeIdxRef.current, src = a.src
+  async function startPlayback(): Promise<void> {
+    const a = audio, src = a.src
     const request = ++playRequestRef.current
-    const isCurrent = () => request === playRequestRef.current && index === activeIdxRef.current && a.src === src
-    if (diagnosticSnapshot().enabled) diagnostic('play.request', { request, ...audioSnapshot(a, index) })
+    const isCurrent = () => request === playRequestRef.current && a.src === src
+    if (diagnosticSnapshot().enabled) diagnostic('play.request', { request, ...audioSnapshot() })
     try {
       await a.play()
-      diagnostic('play.resolved', { request, element: index, current: isCurrent() })
-      if (isCurrent()) lastPlayedIdxRef.current = index
+      diagnostic('play.resolved', { request, element: 0, current: isCurrent() })
     } catch (error) {
-      diagnostic('play.rejected', { request, element: index, current: isCurrent(), name: error && typeof error === 'object' && 'name' in error ? String(error.name) : 'unknown' })
+      diagnostic('play.rejected', { request, element: 0, current: isCurrent(), name: error && typeof error === 'object' && 'name' in error ? String(error.name) : 'unknown' })
       if (!isCurrent()) return // 已切歌或暂停，旧请求不能影响新的播放状态。
       const name = error && typeof error === 'object' && 'name' in error ? String(error.name) : ''
-      const previous = lastPlayedIdxRef.current
-      // 若内核拒绝后台启用另一个音频元素，只回退一次，复用已成功播放过的元素。
-      if (name === 'NotAllowedError' && allowFallback && previous != null && previous !== index) {
-        diagnostic('play.fallback', { from: index, to: previous })
-        a.pause()
-        activeIdxRef.current = previous
-        spareUrlRef.current = ''
-        resumeRef.current = null
-        playedOnceRef.current = false
-        factors.current[previous] = factors.current[index]
-        applyVolumes()
-        cur().src = src
-        setCurrentMs(0); setBufferedMs(0); setStalled(true)
-        setActiveIdx(previous)
-        return startPlayback(false)
-      }
       // AbortError 通常是切歌/暂停取消了 play，不表示需要用户重新授权。
       if (name !== 'AbortError') { setStalled(false); cb.current.onPlayRejected?.(error) }
     }
   }
-  function load(url: string, gain?: ReplayGain) { factors.current[activeIdxRef.current] = normalizationFactor(gain); applyVolumes(); const a = cur(); if (a.src !== url) { ++playRequestRef.current; resumeRef.current = null; a.src = url; setBufferedMs(0); setCurrentMs(0); setStalled(false); playedOnceRef.current = false } }
+  function load(url: string, gain?: ReplayGain) { factor.current = normalizationFactor(gain); applyVolumes(); const a = audio; if (a.src !== url) { ++playRequestRef.current; resumeRef.current = null; a.src = url; setBufferedMs(0); setCurrentMs(0); setDurationMs(0); setStalled(false); playedOnceRef.current = false } }
   function play() { return startPlayback() }
-  function pause() { ++playRequestRef.current; if (resumeRef.current) resumeRef.current.play = false; cur().pause() }
-  function seek(ms: number) { cur().currentTime = ms / 1000 }
-  function applyVolumes() { pair.forEach((a, i) => { a.volume = volumeRef.current * (normalizeRef.current ? factors.current[i] : 1) }) }
+  function pause() { ++playRequestRef.current; if (resumeRef.current) resumeRef.current.play = false; audio.pause() }
+  function seek(ms: number) { audio.currentTime = ms / 1000 }
+  function applyVolumes() { audio.volume = volumeRef.current * (normalizeRef.current ? factor.current : 1) }
   function setVolume(v: number) { volumeRef.current = Math.max(0, Math.min(1, v)); applyVolumes(); setVolumeState(volumeRef.current) }
   function setNormalize(value: boolean) {
     normalizeRef.current = value; setNormalizeState(value); applyVolumes()
     try { localStorage.setItem('tm.normalize', value ? '1' : '0') } catch { /* session-only */ }
-    diagnostic('volume.normalization', { enabled: value, factor: factors.current[activeIdxRef.current] })
+    diagnostic('volume.normalization', { enabled: value, factor: factor.current })
   }
-  function preload(url: string, gain?: ReplayGain) { factors.current[1 - activeIdxRef.current] = normalizationFactor(gain); applyVolumes(); const s = spare(); if (spareUrlRef.current !== url) { s.preload = 'auto'; s.src = url; spareUrlRef.current = url } }
   // 断点重载:重新加载地址,元数据就绪后 seek 回 ms;play=false 时只加载不自动播(暂停中换音质用)
-  function reloadFrom(url: string, ms: number, play = true, gain?: ReplayGain) { if (gain) { factors.current[activeIdxRef.current] = normalizationFactor(gain); applyVolumes() } ++playRequestRef.current; resumeRef.current = { ms, play }; playedOnceRef.current = false; const a = cur(); setStalled(true); a.src = url; a.load() }
-  // 切到已预载的备用元素(已缓冲下一首)。备用地址不匹配则返回 false,让调用方走普通加载。
-  function swapToPreloaded(url: string): boolean {
-    diagnostic('audio.swap', { matched: spareUrlRef.current === url, from: activeIdxRef.current })
-    if (spareUrlRef.current !== url) return false
-    pause() // 停掉旧的活动元素
-    activeIdxRef.current = 1 - activeIdxRef.current
-    resumeRef.current = null
-    playedOnceRef.current = false // 新活动流还没放出声,等它 playing 再允许计入卡顿
-    cur().currentTime = 0
-    spareUrlRef.current = '' // 旧活动元素成为新备用,清掉标记
-    setActiveIdx(activeIdxRef.current)
-    return true
-  }
-  return { normalize, setNormalize, load, play, pause, seek, setVolume, preload, swapToPreloaded, reloadFrom, currentMs, durationMs, bufferedMs, stalled, stallSeq, volume }
+  function reloadFrom(url: string, ms: number, play = true, gain?: ReplayGain) { if (gain) { factor.current = normalizationFactor(gain); applyVolumes() } ++playRequestRef.current; resumeRef.current = { ms, play }; playedOnceRef.current = false; const a = audio; setStalled(true); a.src = url; a.load() }
+  return { normalize, setNormalize, load, play, pause, seek, setVolume, reloadFrom, currentMs, durationMs, bufferedMs, stalled, stallSeq, volume }
 }
