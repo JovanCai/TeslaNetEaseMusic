@@ -67,6 +67,7 @@ Settings are provided through a `.env` file in the project root. Redeploy after 
 | Variable | Default | Description |
 |---|---|---|
 | `APP_PORT` | `80` | The public service port; change it if the port is already in use |
+| `APP_PASSWORD` | empty | Access password (recommended). When set, the first visit asks for it once and it is remembered afterwards; changing it signs out every device |
 | `REGION_UNLOCK` | `false` | Region unlock. When enabled, the backend sends requests from a random China IP to play **licensed** tracks that gray out abroad; relies on your own account's rights |
 | `ENABLE_UNBLOCK` | `false` | Gray-track substitution. When enabled, a same-title track from sources such as QQ or Kugou is played instead; matches may differ in version or audio quality |
 

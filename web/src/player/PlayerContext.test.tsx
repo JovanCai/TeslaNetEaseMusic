@@ -70,6 +70,32 @@ describe('playerReducer', () => {
     expect(s.pos).toBe(before + 1)                    // 沿乱序 order 前进
   })
 
+  it('shuffle 放完一轮(不开循环)不停,重新洗牌继续', () => {
+    let s = playerReducer(play(0), { type: 'setShuffle', on: true })
+    s = playerReducer(s, { type: 'ended' })
+    s = playerReducer(s, { type: 'ended' })            // 到本轮最后一首
+    const last = s.order[s.pos]
+    const token = s.playToken
+    s = playerReducer(s, { type: 'ended' })            // 曲终:开新一轮
+    expect(s.isPlaying).toBe(true)
+    expect(s.pos).toBe(0)
+    expect(s.playToken).toBe(token + 1)
+    expect(s.order[0]).not.toBe(last)                  // 不连播同一首
+    expect([...s.order].sort()).toEqual([0, 1, 2])
+  })
+
+  it('shuffle 最后一首手动 next 也开新一轮;单曲循环曲终仍重播', () => {
+    let s = playerReducer(play(0), { type: 'setShuffle', on: true })
+    s = playerReducer(s, { type: 'jumpTo', pos: 2 })
+    s = playerReducer(s, { type: 'next' })
+    expect(s.isPlaying).toBe(true); expect(s.pos).toBe(0)
+    s = playerReducer(s, { type: 'jumpTo', pos: 2 })
+    s = playerReducer(s, { type: 'cycleRepeat' }); s = playerReducer(s, { type: 'cycleRepeat' }) // → one
+    const order = s.order
+    s = playerReducer(s, { type: 'ended' })
+    expect(s.pos).toBe(2); expect(s.order).toBe(order)
+  })
+
   it('shuffle 关闭:恢复恒等顺序且当前曲不变', () => {
     let s = playerReducer(play(2), { type: 'setShuffle', on: true })
     s = playerReducer(s, { type: 'setShuffle', on: false })

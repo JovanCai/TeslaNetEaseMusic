@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { usePlayer, usePlayerProgress } from './PlayerContext'
 import { parseLrc, getCurrentLineIndex } from '../lyrics/parseLrc'
 import { LyricsView } from '../lyrics/LyricsView'
+import { getLyricOffset, setLyricOffset, formatOffset, OFFSET_STEP, OFFSET_LIMIT } from '../lyrics/lyricOffset'
 import { QueueView } from './QueueView'
 import { QualityPicker } from '../components/QualityPicker'
 import { Icon } from '../components/Icon'
@@ -59,6 +60,12 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
     applyLyricFont()
   }
   const [showQueue, setShowQueue] = useState(false)
+  // 歌词时间微调(按歌记忆):正数 = 歌词提前
+  const curId = p.current?.id ?? -1
+  const [lyricOffset, setLyricOffsetState] = useState(() => getLyricOffset(curId))
+  const [offsetFor, setOffsetFor] = useState(curId)
+  if (offsetFor !== curId) { setOffsetFor(curId); setLyricOffsetState(getLyricOffset(curId)) } // 换歌:读这首的偏移
+  function changeLyricOffset(next: number) { setLyricOffsetState(setLyricOffset(curId, next)) }
   const [showTrans, setShowTrans] = useState(() => {
     try { return localStorage.getItem('tm.showtrans') !== '0' } catch { return true }
   })
@@ -174,7 +181,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
     const map = new Map(trans.map((t) => [t.timeMs, t.text]))
     return main.map((l) => ({ ...l, trans: map.get(l.timeMs) }))
   }, [p.lrc, p.tlyric])
-  const active = getCurrentLineIndex(lines, currentMs)
+  const active = getCurrentLineIndex(lines, currentMs + lyricOffset)
   const hasTrans = lines.some((l) => 'trans' in l && (l as { trans?: string }).trans)
   const displayLines = showTrans ? lines : lines.map((l) => ({ timeMs: l.timeMs, text: l.text }))
 
@@ -209,6 +216,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
           <button className={`tap iconbtn ${p.isLiked(cur.id) ? 'liked' : ''}`} onClick={() => p.toggleLike(cur.id)} aria-label="红心">
             <Icon name={p.isLiked(cur.id) ? 'heartFilled' : 'heart'} size={22} />
           </button>
+          {p.radar && <button className="tap iconbtn" onClick={p.trashFm} aria-label="不喜欢"><Icon name="trash" size={22} /></button>}
           {cur.artistId > 0 && <button className="tap iconbtn" onClick={() => onOpenArtist(cur.artistId)} aria-label="歌手"><Icon name="artist" size={22} /></button>}
           {cur.albumId > 0 && <button className="tap iconbtn" onClick={() => onOpenAlbum(cur.albumId)} aria-label="所属专辑"><Icon name="album" size={22} /></button>}
           <button className="tap iconbtn" onClick={() => setShowQueue(true)} aria-label="播放队列"><Icon name="queue" size={22} /></button>
@@ -223,7 +231,7 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
               ? <div className="np-nolyric">纯音乐 · 请欣赏</div>
               : lines.length === 0
                 ? <div className="np-nolyric">暂无歌词</div>
-                : <LyricsView lines={displayLines} activeIndex={active} onSeek={(ms) => p.seek(ms)} />}
+                : <LyricsView lines={displayLines} activeIndex={active} onSeek={(ms) => p.seek(Math.max(0, ms - lyricOffset))} />}
           </div>
         )}
       </div>
@@ -260,6 +268,9 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
         <div className="np-fontsize">
           <button className="tap iconbtn" onClick={() => changeLyricScale(-0.1)} disabled={lyricScale <= 0.6} aria-label="歌词字号减小">字－</button>
           <button className="tap iconbtn" onClick={() => changeLyricScale(0.1)} disabled={lyricScale >= 1.8} aria-label="歌词字号增大">字＋</button>
+          <button className="tap iconbtn" onClick={() => changeLyricOffset(lyricOffset - OFFSET_STEP)} disabled={lyricOffset <= -OFFSET_LIMIT} aria-label="歌词延后0.5秒">延后</button>
+          {lyricOffset !== 0 && <button className="tap iconbtn lyric-offset" onClick={() => changeLyricOffset(0)} aria-label="歌词时间复位">{formatOffset(lyricOffset)}</button>}
+          <button className="tap iconbtn" onClick={() => changeLyricOffset(lyricOffset + OFFSET_STEP)} disabled={lyricOffset >= OFFSET_LIMIT} aria-label="歌词提前0.5秒">提前</button>
         </div>
       )}
 

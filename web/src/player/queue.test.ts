@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { nextIndex, prevIndex, buildShuffleOrder } from './queue'
+import { nextIndex, prevIndex, buildShuffleOrder, reshuffle } from './queue'
 
 describe('nextIndex', () => {
   it('普通前进', () => expect(nextIndex(3, 0, 'off')).toBe(1))
@@ -17,4 +17,14 @@ describe('buildShuffleOrder', () => {
     expect(order[0]).toBe(2)
     expect([...order].sort((a, b) => a - b)).toEqual([0, 1, 2, 3])
   })
+})
+describe('reshuffle', () => {
+  it('同一批成员重新排列,刚放完的不排第一', () => {
+    for (let n = 0; n < 50; n++) {
+      const order = reshuffle([4, 0, 7, 2], 2)
+      expect(order[0]).not.toBe(2)
+      expect([...order].sort((a, b) => a - b)).toEqual([0, 2, 4, 7])
+    }
+  })
+  it('只有一首时原样返回', () => expect(reshuffle([3], 3)).toEqual([3]))
 })

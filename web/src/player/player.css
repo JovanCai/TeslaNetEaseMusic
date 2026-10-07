@@ -60,6 +60,8 @@ html[data-wide="true"] .mini > .mini-play svg { width:46px; height:46px; }
 /* 5 个操作键始终一行:即使左栏拖到最窄(340)也不换行,缩小键宽与间距容纳 */
 .np.split .np-actions { flex-wrap:nowrap; justify-content:center; gap:6px; }
 .np.split .np-actions .iconbtn { min-width:58px; }
+/* 私人FM 多一个「不喜欢」键(6 个),收窄一点保证 340 宽也放得下 */
+.np.split .np-actions:has(> :nth-child(6)) .iconbtn { min-width:50px; }
 
 /* 歌词字号 +/-:右下角,半透明不抢眼 */
 .np-fontsize { position:absolute; right:16px; bottom:14px; z-index:3; display:flex; gap:6px; }
@@ -69,6 +71,8 @@ html[data-wide="true"] .mini > .mini-play svg { width:46px; height:46px; }
 .np-fontsize .iconbtn:hover { opacity:.9; }
 .np-fontsize .iconbtn:active { opacity:1; color:var(--accent); }
 .np-fontsize .iconbtn:disabled { opacity:.2; }
+/* 歌词时间偏移:非零时常亮显示,点一下复位 */
+.np .np-fontsize .iconbtn.lyric-offset { width:auto; min-width:64px; padding:0 8px; opacity:.9; color:var(--accent); font-variant-numeric:tabular-nums; }
 
 /* 分栏切换:独立到左上角(右上角留给主题按钮),不再混进会换行的操作排(“译”异步出现就不会再挤乱左栏) */
 .np-layout-toggle { position:absolute; top:16px; left:16px; z-index:3;

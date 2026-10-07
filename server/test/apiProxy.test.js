@@ -24,8 +24,15 @@ describe('apiProxy', () => {
     expect(j.cookie).toBe('MUSIC_U=TESTU')
   })
   it('无cookie时不注入', async () => {
-    const res = await request(appWith(null)).get('/api/search?keywords=x')
+    const res = await request(appWith(null)).get('/api/cloudsearch?keywords=x')
     expect(JSON.parse(res.text).cookie).toBeNull()
+  })
+  it('白名单外的接口返回 403,不转发', async () => {
+    const app = appWith('U')
+    const res = await request(app).get('/api/logout')
+    expect(res.status).toBe(403)
+    expect(fetch).not.toHaveBeenCalled()
+    expect((await request(app).get('/api/song/url/v1/../../logout')).status).toBe(403)
   })
   it('区域解锁开启时自动追加中国 realIP', async () => {
     const res = await request(appWith('U', true)).get('/api/song/url/v1?id=5')
