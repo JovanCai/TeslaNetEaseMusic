@@ -97,6 +97,15 @@
 .login h1 { font-size:2.4rem; margin:0; }
 .login-tip { color:var(--text-2); }
 .login-qr { width:260px; height:260px; padding:16px; background:#fff; }
+.unlock-bar { width:min(460px,90%); }
+.unlock-msg { color:#ffb454; }
+
+/* 搜索联想 */
+.search-suggest { margin:-8px 0 16px; padding:4px; border-radius:14px; display:flex; flex-direction:column; }
+.suggest-row { justify-content:flex-start; min-height:52px; padding:0 14px; border-radius:10px; color:var(--text); }
+.suggest-row:active { background:var(--surface); }
+
+.load-more { display:flex; margin:16px auto 0; }
 
 .theme-pop { max-height:calc(var(--app-height,100vh) - 88px); overflow-y:auto; max-width:calc(100% - 28px); }
 .display-size { padding:8px 4px 12px; border-bottom:1px solid var(--border); }

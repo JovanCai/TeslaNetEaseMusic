@@ -137,7 +137,9 @@ docker compose up -d
 
 程序在服务端已登录你的账号,所以**谁打开这个地址,进来就是你的账号**:能点红心、翻你的歌单、用你账号播放。域名也能通过证书透明日志之类被搜到,加一道登录更稳妥。
 
-用 **Cloudflare Access**(免费,不改代码)在隧道前挡一层:
+**最简单:设置访问密码。** 在 `.env` 加一行 `APP_PASSWORD=你的密码`,执行 `docker compose up -d` 生效。车机第一次打开会要求输入密码,之后长期记住(HttpOnly cookie,有效期一年);改密码会让所有设备重新输入。连续输错 10 次锁定 10 分钟。
+
+想要更强的保护(邮箱验证码、按设备放行),可以再用 **Cloudflare Access**(免费,不改代码)在隧道前挡一层:
 
 1. [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → **Access → Applications → Add an application** → 选 **Self-hosted and private**,子标签切到 **Public DNS**(保护公开域名;**不是** WARP 那种私有资源)。
 2. **Destinations → Public hostnames**:填子域名 + 域名(如 `music` + `你的域名.com`)。

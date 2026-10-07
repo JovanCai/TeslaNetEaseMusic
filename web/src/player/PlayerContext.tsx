@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react'
-import { nextIndex, prevIndex, buildShuffleOrder, type Repeat } from './queue'
-import { getSongUrl, getLyric, getPersonalFm, getLikedIds, setLike, getLoginStatus, type Song } from '../api'
+import { nextIndex, prevIndex, buildShuffleOrder, reshuffle, type Repeat } from './queue'
+import { getSongUrl, getLyric, getPersonalFm, getLikedIds, setLike, getLoginStatus, scrobble, fmTrash, type Song } from '../api'
 import { useAudio } from './useAudio'
 import { diagnostic, mediaFingerprint } from './diagnostics'
 import type { ReplayGain } from './normalization'
@@ -41,6 +41,11 @@ const curQueueIndex = (s: PlayerState) => (s.pos >= 0 ? s.order[s.pos] : -1)
 const RADAR_CAP = 150, RADAR_KEEP_BEHIND = 40 // 私人FM 队列上限与保留的已播条数
 const RECOVER_AFTER_MS = 90_000 // 自动降档后,稳定这么久不卡 → 自动升回音质
 
+// 随机播放与网易云 App 一致:放完一轮不停,重新洗牌继续(否则不开循环时整张歌单放完就停了)
+const endOfShuffleRound = (s: PlayerState) => s.shuffle && !s.radar && s.order.length > 0 && s.pos === s.order.length - 1
+const startNewShuffleRound = (s: PlayerState): PlayerState =>
+  ({ ...s, order: reshuffle(s.order, s.order[s.pos]), pos: 0, isPlaying: true, lrc: '', tlyric: '', pureMusic: false, playToken: s.playToken + 1 })
+
 export function playerReducer(s: PlayerState, a: Action): PlayerState {
   switch (a.type) {
     case 'playList': {
@@ -68,10 +73,12 @@ export function playerReducer(s: PlayerState, a: Action): PlayerState {
     case 'toggle': return { ...s, isPlaying: !s.isPlaying }
     case 'stop': return { ...s, isPlaying: false }
     case 'ended': { // 自动续播(曲终):遵循单曲循环=重播当前
+      if (s.repeat !== 'one' && endOfShuffleRound(s)) return startNewShuffleRound(s)
       const p = nextIndex(s.order.length, s.pos, s.repeat)
       return p < 0 ? { ...s, isPlaying: false } : { ...s, pos: p, isPlaying: true, lrc: '', tlyric: '', pureMusic: false, playToken: s.playToken + 1 }
     }
     case 'next': { // 手动下一首 / 跳过死歌:单曲循环下也要真正前进(one 视作 all)
+      if (endOfShuffleRound(s)) return startNewShuffleRound(s)
       const p = nextIndex(s.order.length, s.pos, s.repeat === 'one' ? 'all' : s.repeat)
       return p < 0 ? { ...s, isPlaying: false } : { ...s, pos: p, isPlaying: true, lrc: '', tlyric: '', pureMusic: false, playToken: s.playToken + 1 }
     }
@@ -140,6 +147,7 @@ interface PlayerValue extends PlayerState {
   isLiked: (id: number) => boolean; toggleLike: (id: number) => void
   jumpTo: (pos: number) => void; removeAt: (pos: number) => void
   enqueueNext: (song: Song) => void; enqueue: (song: Song) => void
+  trashFm: () => void
   quality: string; setQuality: (id: string) => void
   lowData: boolean; setLowData: (v: boolean) => void
 }
@@ -172,6 +180,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const lowDataAutoRef = useRef(false) // 当前省流是"自动降档"触发的吗(自动的只存内存、会话级;手动的写 localStorage)
   const lastStallAtRef = useRef(0)   // 最后一次真·卡顿时间戳(升回计时用)
   const stallCountRef = useRef(0)    // 当前曲卡顿次数(在线时反复卡→自动开省流)
+  // 听歌记录:累计当前曲「真正在播」的时长(拖进度不算),换曲/关页时达标就上报网易云
+  const listenRef = useRef<{ id: number; sourceId: number; ms: number; durMs: number } | null>(null)
+  const lastTickRef = useRef(0)
+  const flushListen = useCallback((beacon = false) => {
+    const l = listenRef.current
+    listenRef.current = null
+    if (l && (l.ms >= 30_000 || (l.durMs > 0 && l.ms >= Math.min(l.durMs / 2, 30_000) && l.ms >= 10_000)))
+      scrobble(l.id, l.sourceId, Math.round(l.ms / 1000), beacon)
+  }, [])
 
   // 跳过播不了的歌:连续失败超过队列长度就停,避免死循环
   const advanceAfterUnplayable = useCallback(() => {
@@ -300,6 +317,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (!current) return
     diagnostic('track.load', { song: current.id, token: state.playToken })
     interruptedRef.current = null; setNetInterrupted(false); playedRef.current = 0; stallCountRef.current = 0; curIdRef.current = current.id // 换曲:清掉上一首的断网/卡顿状态
+    flushListen() // 上一首(含单曲循环的上一遍)听够了就上报
+    listenRef.current = { id: current.id, sourceId: current.albumId, ms: 0, durMs: 0 }; lastTickRef.current = 0
     let cancelled = false
     ;(async () => {
       // 复用预取的地址，但始终在原音频元素上播放，避免后台启用第二个元素。
@@ -354,6 +373,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     })()
     return () => { cancelled = true }
   }, [state.playToken]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 累计收听时长:只认正常播放的小步前进(<3s),拖动进度/换曲时的跳变不计
+  useEffect(() => {
+    const l = listenRef.current
+    const d = currentMs - lastTickRef.current
+    lastTickRef.current = currentMs
+    if (!l || !isPlayingRef.current || l.id !== curIdRef.current) return
+    if (d > 0 && d < 3000) l.ms += d
+    if (durationMs > 0) l.durMs = durationMs
+  }, [currentMs, durationMs])
+  useEffect(() => {
+    const onHide = () => flushListen(true)
+    window.addEventListener('pagehide', onHide)
+    return () => window.removeEventListener('pagehide', onHide)
+  }, [flushListen])
 
   const firstRun = useRef(true)
   useEffect(() => {
@@ -497,6 +531,12 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     removeAt: (pos) => dispatch({ type: 'removeAt', pos }),
     enqueueNext: (song) => { dispatch({ type: 'enqueueNext', song }); toast('已设为下一首') },
     enqueue: (song) => { dispatch({ type: 'enqueue', song }); toast('已加入队列') },
+    trashFm: () => {
+      if (!state.radar || !current) return
+      listenRef.current = null // 不喜欢的歌不记入听歌记录
+      dispatch({ type: 'next' })
+      fmTrash(current.id).then(() => toast('已减少此类推荐')).catch(() => toast('操作失败,请稍后再试'))
+    },
     playList: (songs, start) => dispatch({ type: 'playList', songs, start }),
     startRadar: () => { getPersonalFm().then((songs) => { if (songs.length) dispatch({ type: 'startRadar', songs }) }).catch(() => {}) },
     toggle: () => dispatch({ type: 'toggle' }),

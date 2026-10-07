@@ -3,6 +3,10 @@ const BASE = '/api'
 
 // 统一请求:加超时(默认 8s,弱网下不会无限转圈)与失败退避重试(默认 2 次)。
 // 关键:闲置后后端到网易的连接会冷掉,第一发常失败;重试能自愈,避免上层把"暂时取不到"误判成"这首播不了"直接跳歌。
+// 设置了访问密码而未通过时,后端返回 401:广播给 App 切到输密码界面,且不重试。
+export const AUTH_REQUIRED_EVENT = 'tm-auth-required'
+export class AuthRequiredError extends Error {}
+
 async function fetchJson(path: string, { timeout = 8000, retries = 2 } = {}): Promise<any> {
   let lastErr: unknown
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -10,10 +14,12 @@ async function fetchJson(path: string, { timeout = 8000, retries = 2 } = {}): Pr
     const timer = setTimeout(() => ctrl.abort(), timeout)
     try {
       const r = await fetch(`${BASE}${path}`, { signal: ctrl.signal })
+      if (r.status === 401) { window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT)); throw new AuthRequiredError(path) }
       if (!r.ok) throw new Error(`${path} ${r.status}`)
       return await r.json()
     } catch (e) {
       lastErr = e
+      if (e instanceof AuthRequiredError) break
       if (attempt < retries) await new Promise((res) => setTimeout(res, 500 * (attempt + 1))) // 退避 0.5s / 1s
     } finally {
       clearTimeout(timer)
@@ -81,6 +87,13 @@ export async function search(keywords: string): Promise<Song[]> {
 }
 
 export interface Card { id: number; name: string; cover: string; sub: string }
+
+// 搜索建议:边打字边联想。车机打字费劲,失败就不显示,不重试。
+export async function searchSuggest(keywords: string): Promise<string[]> {
+  const j = await fetchJson(`/search/suggest?keywords=${encodeURIComponent(keywords)}&type=mobile`, { timeout: 4000, retries: 0 })
+  const words: string[] = (j?.result?.allMatch ?? []).map((m: any) => m?.keyword).filter((k: unknown) => typeof k === 'string' && k)
+  return [...new Set(words)].slice(0, 8)
+}
 
 export async function searchAlbums(keywords: string): Promise<Card[]> {
   const j = await getJson(`/cloudsearch?keywords=${encodeURIComponent(keywords)}&type=10&limit=30`)
@@ -154,4 +167,46 @@ export async function getArtist(id: number): Promise<{ name: string; cover: stri
     cover: toHttps(a.picUrl ?? a.img1v1Url ?? ''),
     songs: (j?.hotSongs ?? []).map(toSong),
   }
+}
+
+// 听歌记录上报:回传网易云,进入「最近播放」/听歌排行,推荐也会参考。
+// beacon=true 用于页面关闭时(sendBeacon 在卸载时也能发出去)。
+export function scrobble(id: number, sourceId: number, seconds: number, beacon = false): void {
+  const path = `/scrobble?id=${id}&sourceid=${sourceId}&time=${seconds}&timestamp=${Date.now()}`
+  if (beacon && typeof navigator.sendBeacon === 'function' && navigator.sendBeacon(`${BASE}${path}`)) return
+  fetchJson(path, { retries: 1 }).catch(() => {})
+}
+
+// 私人FM「不喜欢」:减少此类推荐
+export async function fmTrash(id: number): Promise<void> {
+  const j = await fetchJson(`/fm_trash?id=${id}&timestamp=${Date.now()}`, { retries: 1 })
+  if (j?.code !== 200) throw new Error(`fm_trash ${j?.code}`)
+}
+
+// 播客 / 有声书(网易云电台)
+const radioCard = (r: any): Card => ({ id: r.id, name: r.name, cover: toHttps(r.picUrl ?? r.intervenePicUrl ?? ''), sub: r.programCount ? `${r.programCount} 期` : (r.dj?.nickname ?? '') })
+
+export async function getMyRadios(): Promise<Card[]> {
+  const j = await getJson('/dj/sublist?limit=60')
+  return (j?.djRadios ?? []).map(radioCard)
+}
+export async function getRecommendRadios(): Promise<Card[]> {
+  const j = await getJson('/dj/recommend')
+  return (j?.djRadios ?? []).map(radioCard)
+}
+export async function searchRadios(keywords: string): Promise<Card[]> {
+  const j = await getJson(`/cloudsearch?keywords=${encodeURIComponent(keywords)}&type=1009&limit=30`)
+  return (j?.result?.djRadios ?? []).map(radioCard)
+}
+
+// 电台节目:节目的音频就是 mainSong,用它的 id 走正常的取地址/播放流程。
+export async function getRadioPrograms(rid: number, offset: number, asc: boolean): Promise<{ songs: Song[]; more: boolean }> {
+  const j = await getJson(`/dj/program?rid=${rid}&limit=100&offset=${offset}&asc=${asc}`)
+  const songs: Song[] = (j?.programs ?? [])
+    .map((p: any) => ({
+      id: p.mainSong?.id ?? p.mainTrackId ?? 0, name: p.name ?? p.mainSong?.name ?? '',
+      artist: p.radio?.name ?? p.dj?.nickname ?? '', cover: toHttps(p.coverUrl ?? p.radio?.picUrl ?? ''), albumId: 0, artistId: 0,
+    }))
+    .filter((s: Song) => s.id > 0)
+  return { songs, more: !!j?.more }
 }

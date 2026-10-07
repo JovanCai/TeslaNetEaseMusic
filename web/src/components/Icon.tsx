@@ -1,4 +1,4 @@
-type Name = 'play' | 'pause' | 'prev' | 'next' | 'shuffle' | 'repeat' | 'repeatOne' | 'chevronDown' | 'search' | 'volume' | 'radar' | 'palette' | 'heart' | 'heartFilled' | 'album' | 'queue' | 'plus' | 'artist' | 'layout' | 'resizeLR'
+type Name = 'play' | 'pause' | 'prev' | 'next' | 'shuffle' | 'repeat' | 'repeatOne' | 'chevronDown' | 'search' | 'volume' | 'radar' | 'palette' | 'heart' | 'heartFilled' | 'album' | 'queue' | 'plus' | 'artist' | 'layout' | 'resizeLR' | 'trash' | 'podcast'
 
 const PATHS: Record<Name, React.ReactNode> = {
   play: <path d="M8 5v14l11-7z" fill="currentColor" stroke="none" />,
@@ -21,6 +21,8 @@ const PATHS: Record<Name, React.ReactNode> = {
   artist: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
   layout: <><rect x="3" y="4" width="7" height="16" rx="1.5" /><rect x="13" y="4" width="8" height="16" rx="1.5" /></>,
   resizeLR: <><path d="M10 8l-4 4 4 4" /><path d="M14 8l4 4-4 4" /></>,
+  trash: <><path d="M4 7h16" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M6 7l1 13h10l1-13" /><path d="M9 7V4h6v3" /></>,
+  podcast: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0" /><path d="M12 18v3" /></>,
 }
 
 export function Icon({ name, size = 26 }: { name: Name; size?: number }) {

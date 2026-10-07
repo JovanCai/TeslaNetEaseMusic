@@ -20,3 +20,14 @@ export function buildShuffleOrder(len: number, current: number): number[] {
   }
   return [current, ...rest]
 }
+
+// 随机模式放完一轮:把同一批歌重新洗牌接着放。刚放完的那首不排在新一轮开头,避免连播同一首。
+export function reshuffle(members: number[], justPlayed: number): number[] {
+  const out = [...members]
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[out[i], out[j]] = [out[j], out[i]]
+  }
+  if (out.length > 1 && out[0] === justPlayed) { const k = 1 + Math.floor(Math.random() * (out.length - 1)); [out[0], out[k]] = [out[k], out[0]] }
+  return out
+}

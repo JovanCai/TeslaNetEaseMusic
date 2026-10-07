@@ -19,6 +19,8 @@ services:
       - COOKIE_PATH=/data/cookie
       # 区域解锁:开启后后端自动注入随机中国 IP(realIP),解掉海外变灰的有版权歌
       - REGION_UNLOCK=${REGION_UNLOCK:-false}
+      # 访问密码:设置后需输密码才能用(cookie 长期记住)。留空则不需要。
+      - APP_PASSWORD=${APP_PASSWORD:-}
     volumes:
       - cookie-data:/data
     restart: unless-stopped
