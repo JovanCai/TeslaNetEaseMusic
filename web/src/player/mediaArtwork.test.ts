@@ -29,9 +29,27 @@ it('submits new artwork immediately without waiting for image loading', () => {
   expect((media.metadata as MediaMetadata | null)?.artwork[0].src).toBe(images[0].src)
   media.metadata = null
   vi.advanceTimersByTime(5000)
-  expect((media.metadata as MediaMetadata | null)?.artwork[0].src).toBe(images[0].src)
+  // 纠正提交必须换 URL:Chromium 会忽略与当前完全相同的 artwork
+  expect((media.metadata as MediaMetadata | null)?.artwork[0].src).toBe('https://cover.test/1.jpg?existing=1&param=500y500')
+  vi.advanceTimersByTime(15000)
+  expect((media.metadata as MediaMetadata | null)?.artwork[0].src).toBe('https://cover.test/1.jpg?existing=1&param=480y480')
   expect(vi.getTimerCount()).toBe(0)
   publisher.dispose()
+})
+it('every corrective publish uses a URL different from the previous one', () => {
+  const publisher = createArtworkPublisher(song(1))
+  publisher.sync()
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+  const seen = [media.metadata!.artwork[0].src]
+  for (let i = 0; i < 5; i++) {
+    document.dispatchEvent(new Event('visibilitychange'))
+    const src = media.metadata!.artwork[0].src
+    expect(src).not.toBe(seen[seen.length - 1])
+    expect(src).toContain('/1.jpg')
+    seen.push(src)
+  }
+  publisher.dispose()
+  vi.restoreAllMocks()
 })
 it('falls back to the original image when the resized image fails', () => {
   const publisher = createArtworkPublisher(song(1))
@@ -62,7 +80,7 @@ it('ignores late image callbacks and cancels retries after a track change', () =
 it('keeps the current artwork URL submitted even if both probes time out', () => {
   const publisher = createArtworkPublisher(song(1))
   publisher.sync()
-  vi.advanceTimersByTime(20000)
+  vi.advanceTimersByTime(40000)
   expect(images).toHaveLength(2)
   expect(media.metadata?.artwork[0].src).toBe('https://cover.test/1.jpg?existing=1&param=128y128')
   expect(vi.getTimerCount()).toBe(0)
