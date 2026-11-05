@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { THEMES, AUTO, systemScheme, loadThemePref, setThemePref, applyResolvedTheme, ensureSunTimes } from '../ui/themes'
 import { DISPLAY_SCALES, loadDisplayScale, setDisplayScale } from '../ui/displayScale'
-import { usePlayer } from '../player/PlayerContext'
+import { usePlayer } from '../player/usePlayer'
 import { Icon } from './Icon'
 
 export function ThemePicker() {

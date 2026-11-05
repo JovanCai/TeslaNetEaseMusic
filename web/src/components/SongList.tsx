@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Song } from '../api'
-import { usePlayer } from '../player/PlayerContext'
+import { usePlayer } from '../player/usePlayer'
 import { displayScale } from '../ui/displayScale'
 import { Icon } from './Icon'
 

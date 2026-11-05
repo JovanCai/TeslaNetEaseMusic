@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getDailySongs, type Song } from '../api'
 import { SongList } from '../components/SongList'
-import { usePlayer } from '../player/PlayerContext'
+import { usePlayer } from '../player/usePlayer'
 import { Icon } from '../components/Icon'
 
 export function Daily() {

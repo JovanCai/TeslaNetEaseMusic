@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getRadioPrograms, type Card, type Song } from '../api'
 import { SongList } from '../components/SongList'
-import { usePlayer } from '../player/PlayerContext'
+import { usePlayer } from '../player/usePlayer'
 import { Icon } from '../components/Icon'
 
 // 排序按电台记忆:有声书/连载通常要正序(从第一集听),新闻类播客倒序(最新在前)

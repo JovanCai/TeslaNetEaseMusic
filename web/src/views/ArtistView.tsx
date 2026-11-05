@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getArtist, type Song } from '../api'
 import { SongList } from '../components/SongList'
-import { usePlayer } from '../player/PlayerContext'
+import { usePlayer } from '../player/usePlayer'
 import { Icon } from '../components/Icon'
 
 export function ArtistView({ artistId, onClose }: { artistId: number; onClose: () => void }) {

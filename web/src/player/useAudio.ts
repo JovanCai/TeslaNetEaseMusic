@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { loadNormalization, normalizationFactor, type ReplayGain } from './normalization'
 import { diagnostic, diagnosticSnapshot, mediaFingerprint } from './diagnostics'
+
+const audioSnapshot = (audio: HTMLAudioElement) => ({ element: 0, active: true, source: mediaFingerprint(audio.currentSrc || audio.src), seconds: Number.isFinite(audio.currentTime) ? Math.round(audio.currentTime) : -1, duration: Number.isFinite(audio.duration) ? Math.round(audio.duration) : -1, paused: audio.paused, ended: audio.ended, ready: audio.readyState, network: audio.networkState, error: audio.error?.code ?? 0 })
 
 export function useAudio(onEnded?: (posMs: number, durMs: number) => void, onError?: (e: MediaError | null) => void, initialVolume = 1, onPlaybackStarted?: () => void, onPlayRejected?: (error: unknown) => void) {
   const [currentMs, setCurrentMs] = useState(0)
@@ -26,17 +28,34 @@ export function useAudio(onEnded?: (posMs: number, durMs: number) => void, onErr
     return a
   })
   const playRequestRef = useRef(0)
-  const audioSnapshot = () => ({ element: 0, active: true, source: mediaFingerprint(audio.currentSrc || audio.src), seconds: Number.isFinite(audio.currentTime) ? Math.round(audio.currentTime) : -1, duration: Number.isFinite(audio.duration) ? Math.round(audio.duration) : -1, paused: audio.paused, ended: audio.ended, ready: audio.readyState, network: audio.networkState, error: audio.error?.code ?? 0 })
   useEffect(() => {
-    const report = () => diagnostic('audio.snapshot', audioSnapshot())
+    const report = () => diagnostic('audio.snapshot', audioSnapshot(audio))
     window.addEventListener('tm-diagnostic-snapshot', report)
     document.addEventListener('visibilitychange', report)
     return () => { window.removeEventListener('tm-diagnostic-snapshot', report); document.removeEventListener('visibilitychange', report) }
   }, [audio])
 
+  const startPlayback = useCallback(async (): Promise<void> => {
+    const a = audio, src = a.src
+    const request = ++playRequestRef.current
+    const isCurrent = () => request === playRequestRef.current && a.src === src
+    if (diagnosticSnapshot().enabled) diagnostic('play.request', { request, ...audioSnapshot(a) })
+    try {
+      await a.play()
+      diagnostic('play.resolved', { request, element: 0, current: isCurrent() })
+    } catch (error) {
+      diagnostic('play.rejected', { request, element: 0, current: isCurrent(), name: error && typeof error === 'object' && 'name' in error ? String(error.name) : 'unknown' })
+      if (!isCurrent()) return // 已切歌或暂停，旧请求不能影响新的播放状态。
+      const name = error && typeof error === 'object' && 'name' in error ? String(error.name) : ''
+      // AbortError 通常是切歌/暂停取消了 play，不表示需要用户重新授权。
+      if (name !== 'AbortError') { setStalled(false); cb.current.onPlayRejected?.(error) }
+    }
+  }, [audio])
+
   // 监听始终绑定在同一个元素上。
   useEffect(() => {
     const a = audio
+    const playRequests = playRequestRef // 清理时作废进行中的 play 请求(计数器,不是 DOM 引用)
     const readBuffered = () => setBufferedMs(a.buffered.length ? a.buffered.end(a.buffered.length - 1) * 1000 : 0)
     const onTime = () => { setCurrentMs(a.currentTime * 1000); readBuffered() }
     const onMeta = () => {
@@ -60,7 +79,7 @@ export function useAudio(onEnded?: (posMs: number, durMs: number) => void, onErr
       const listener = () => {
         if (diagnosticSnapshot().enabled && event !== 'progress' && (event !== 'timeupdate' || Date.now() - lastTick >= 10000)) {
           if (event === 'timeupdate') lastTick = Date.now()
-          diagnostic(`audio.${event}`, audioSnapshot())
+          diagnostic(`audio.${event}`, audioSnapshot(a))
         }
         handler()
       }
@@ -68,28 +87,11 @@ export function useAudio(onEnded?: (posMs: number, durMs: number) => void, onErr
       return () => a.removeEventListener(event, listener)
     })
     return () => {
-      ++playRequestRef.current
+      ++playRequests.current
       listeners.forEach((remove) => remove())
       a.pause()
     }
-  }, [audio])
-
-  async function startPlayback(): Promise<void> {
-    const a = audio, src = a.src
-    const request = ++playRequestRef.current
-    const isCurrent = () => request === playRequestRef.current && a.src === src
-    if (diagnosticSnapshot().enabled) diagnostic('play.request', { request, ...audioSnapshot() })
-    try {
-      await a.play()
-      diagnostic('play.resolved', { request, element: 0, current: isCurrent() })
-    } catch (error) {
-      diagnostic('play.rejected', { request, element: 0, current: isCurrent(), name: error && typeof error === 'object' && 'name' in error ? String(error.name) : 'unknown' })
-      if (!isCurrent()) return // 已切歌或暂停，旧请求不能影响新的播放状态。
-      const name = error && typeof error === 'object' && 'name' in error ? String(error.name) : ''
-      // AbortError 通常是切歌/暂停取消了 play，不表示需要用户重新授权。
-      if (name !== 'AbortError') { setStalled(false); cb.current.onPlayRejected?.(error) }
-    }
-  }
+  }, [audio, startPlayback])
   function load(url: string, gain?: ReplayGain) { factor.current = normalizationFactor(gain); applyVolumes(); const a = audio; if (a.src !== url) { ++playRequestRef.current; resumeRef.current = null; a.src = url; setBufferedMs(0); setCurrentMs(0); setDurationMs(0); setStalled(false); playedOnceRef.current = false } }
   function play() { return startPlayback() }
   function pause() { ++playRequestRef.current; if (resumeRef.current) resumeRef.current.play = false; audio.pause() }

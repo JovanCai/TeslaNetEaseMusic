@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { usePlayer, usePlayerProgress } from './PlayerContext'
+import { usePlayer, usePlayerProgress } from './usePlayer'
 import { parseLrc, getCurrentLineIndex } from '../lyrics/parseLrc'
 import { LyricsView } from '../lyrics/LyricsView'
 import { getLyricOffset, setLyricOffset, formatOffset, OFFSET_STEP, OFFSET_LIMIT } from '../lyrics/lyricOffset'
@@ -60,6 +60,26 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
     applyLyricFont()
   }
   const [showQueue, setShowQueue] = useState(false)
+  // 切歌换碟:旧唱片朝一个方向滑出、新唱片从另一侧滑入。下一首向左出,上一首向右出。
+  // 在渲染时比对歌曲变化(此刻 DOM 仍是旧唱片),记下旧唱片的封面和当前转角,让它带着原角度滑走。
+  const discRef = useRef<HTMLDivElement>(null)
+  const [shown, setShown] = useState(() => ({ id: p.current?.id ?? -1, pos: p.pos }))
+  const [leaving, setLeaving] = useState<{ key: number; cover: string; dir: 'next' | 'prev'; transform: string } | null>(null)
+  const [slideDir, setSlideDir] = useState<'next' | 'prev' | null>(null)
+  if (p.current && p.current.id !== shown.id) {
+    const dir = p.pos === shown.pos - 1 ? 'prev' : 'next'
+    const el = discRef.current
+    if (el && shown.id >= 0) {
+      setLeaving({ key: Date.now(), cover: el.querySelector('img')?.getAttribute('src') ?? '', dir, transform: getComputedStyle(el).transform })
+      setSlideDir(dir)
+    }
+    setShown({ id: p.current.id, pos: p.pos })
+  } else if (p.pos !== shown.pos) setShown({ id: shown.id, pos: p.pos }) // 队列增删导致下标变化:同步,方向判断才准
+  useEffect(() => {
+    if (!leaving) return
+    const t = window.setTimeout(() => setLeaving(null), 650) // 动画结束后移除旧唱片(减少动态效果时动画不触发,也靠这个兜底)
+    return () => window.clearTimeout(t)
+  }, [leaving])
   // 歌词时间微调(按歌记忆):正数 = 歌词提前
   const curId = p.current?.id ?? -1
   const [lyricOffset, setLyricOffsetState] = useState(() => getLyricOffset(curId))
@@ -207,9 +227,19 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
       )}
       <div className="np-top" data-flip="top">
         {/* 黑胶唱片:播放时唱片旋转、唱臂落下;暂停时停在当前角度、唱臂抬起(同网易云) */}
-        <div className={`vinyl ${p.isPlaying ? 'playing' : ''}`} onClick={enterDiagnostics}>
-          <div key={cur.id} className="vinyl-disc">
-            {cur.cover && <img className="vinyl-cover" src={cur.cover} alt="" draggable={false} />}
+        {/* 换碟期间唱臂抬起,新唱片到位后再落下 */}
+        <div className={`vinyl ${p.isPlaying && !leaving ? 'playing' : ''}`} onClick={enterDiagnostics}>
+          {leaving && (
+            <div key={leaving.key} className={`vinyl-slot leave-${leaving.dir}`} aria-hidden="true">
+              <div className="vinyl-disc still" style={{ transform: leaving.transform === 'none' ? undefined : leaving.transform }}>
+                {leaving.cover && <img className="vinyl-cover" src={leaving.cover} alt="" draggable={false} />}
+              </div>
+            </div>
+          )}
+          <div key={cur.id} className={`vinyl-slot ${slideDir ? `enter-${slideDir}` : ''}`}>
+            <div ref={discRef} className="vinyl-disc">
+              {cur.cover && <img className="vinyl-cover" src={cur.cover} alt="" draggable={false} />}
+            </div>
           </div>
           <svg className="vinyl-arm" viewBox="0 0 60 120" aria-hidden="true">
             <path d="M46 14 L46 64 L30 98" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />

@@ -1,6 +1,7 @@
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { PlayerProvider, usePlayer } from './PlayerContext'
+import { PlayerProvider } from './PlayerContext'
+import { usePlayer } from './usePlayer'
 import { getSongUrl } from '../api'
 
 vi.mock('../api', () => ({

@@ -1,4 +1,4 @@
-import { usePlayer } from './PlayerContext'
+import { usePlayer } from './usePlayer'
 import { Icon } from '../components/Icon'
 import './player.css'
 

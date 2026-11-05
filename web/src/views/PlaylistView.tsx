@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getPlaylistTracks, type Song } from '../api'
 import { SongList } from '../components/SongList'
-import { usePlayer } from '../player/PlayerContext'
+import { usePlayer } from '../player/usePlayer'
 import { Icon } from '../components/Icon'
 
 export function PlaylistView({ id, name, onClose }: { id: number; name: string; onClose: () => void }) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { playerReducer, initialPlayerState } from './PlayerContext'
+import { playerReducer, initialPlayerState } from './playerReducer'
 
 const songs = [
   { id: 1, name: 'a', artist: 'x', cover: '', albumId: 0, artistId: 0 },
