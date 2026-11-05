@@ -206,7 +206,18 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
         </div>
       )}
       <div className="np-top" data-flip="top">
-        {cur.cover && <img key={cur.id} className="np-cover" src={cur.cover} alt="" draggable={false} onClick={enterDiagnostics} />}
+        {/* 黑胶唱片:播放时唱片旋转、唱臂落下;暂停时停在当前角度、唱臂抬起(同网易云) */}
+        <div className={`vinyl ${p.isPlaying ? 'playing' : ''}`} onClick={enterDiagnostics}>
+          <div key={cur.id} className="vinyl-disc">
+            {cur.cover && <img className="vinyl-cover" src={cur.cover} alt="" draggable={false} />}
+          </div>
+          <svg className="vinyl-arm" viewBox="0 0 60 120" aria-hidden="true">
+            <path d="M46 14 L46 64 L30 98" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+            <rect x="22" y="94" width="14" height="20" rx="3" transform="rotate(26 29 104)" fill="currentColor" />
+            <circle cx="46" cy="14" r="11" fill="var(--vinyl-pivot)" />
+            <circle cx="46" cy="14" r="4.5" fill="currentColor" />
+          </svg>
+        </div>
         <div className="np-title">{cur.name}</div>
         <div className="np-artist">{cur.artist}</div>
         {(netInterrupted || stalled) && (
