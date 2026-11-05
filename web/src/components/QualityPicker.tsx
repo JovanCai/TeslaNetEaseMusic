@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { usePlayer } from '../player/PlayerContext'
+import { usePlayer } from '../player/usePlayer'
 import { QUALITIES, qualityName } from '../ui/quality'
 
 export function QualityPicker() {

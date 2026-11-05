@@ -1,4 +1,4 @@
-import { usePlayer, usePlayerProgress } from './PlayerContext'
+import { usePlayer, usePlayerProgress } from './usePlayer'
 import { Icon } from '../components/Icon'
 import './player.css'
 

@@ -102,15 +102,26 @@ html[data-wide="true"] .np.ctl-sm .np-ctl .iconbtn[aria-label="下一首"] svg {
   background:repeating-radial-gradient(circle, #121212 0 1.5px, #1d1d1d 1.5px 3px);
   box-shadow:0 12px 40px rgba(0,0,0,.55), 0 0 0 calc(var(--disc) * .03) rgba(255,255,255,.06);
   will-change:transform;
-  /* 旋转 + 切歌淡入;暂停时只停旋转,保留当前角度 */
-  animation:vinylSpin 24s linear infinite, npFade .5s ease; animation-play-state:paused, running; }
-.vinyl.playing .vinyl-disc { animation-play-state:running, running; }
+  /* 暂停时只停旋转,保留当前角度 */
+  animation:vinylSpin 24s linear infinite; animation-play-state:paused; }
+.vinyl.playing .vinyl-disc { animation-play-state:running; }
+.vinyl-disc.still { animation:none; } /* 滑出的旧唱片:定格在离开时的角度 */
+/* 唱片槽:负责换碟滑动(唱片自身的 transform 留给旋转,两者互不干扰) */
+.vinyl-slot { position:absolute; inset:0; animation:npFade .5s ease; }
+.vinyl-slot.enter-next { animation:vinylInFromRight .55s cubic-bezier(.22,.8,.3,1) both; }
+.vinyl-slot.enter-prev { animation:vinylInFromLeft .55s cubic-bezier(.22,.8,.3,1) both; }
+.vinyl-slot.leave-next { animation:vinylOutToLeft .45s cubic-bezier(.5,0,.75,.4) both; pointer-events:none; }
+.vinyl-slot.leave-prev { animation:vinylOutToRight .45s cubic-bezier(.5,0,.75,.4) both; pointer-events:none; }
+@keyframes vinylOutToLeft { to { transform:translateX(-125%); opacity:0; } }
+@keyframes vinylOutToRight { to { transform:translateX(125%); opacity:0; } }
+@keyframes vinylInFromRight { from { transform:translateX(125%); opacity:0; } }
+@keyframes vinylInFromLeft { from { transform:translateX(-125%); opacity:0; } }
 .vinyl-cover { width:64%; height:64%; border-radius:50%; object-fit:cover; box-shadow:0 0 0 calc(var(--disc) * .02) #0b0b0b; }
 /* 中心轴孔 */
 .vinyl-disc::after { content:''; position:absolute; width:5%; height:5%; border-radius:50%; background:#0b0b0b;
   box-shadow:0 0 0 1.5px rgba(255,255,255,.25); }
-/* 固定的高光(不随唱片转),转动时才有黑胶反光的质感 */
-.vinyl::after { content:''; position:absolute; inset:0; border-radius:50%; pointer-events:none; z-index:1;
+/* 固定的高光(不随唱片转,但随唱片槽一起滑),转动时才有黑胶反光的质感 */
+.vinyl-slot::after { content:''; position:absolute; inset:0; border-radius:50%; pointer-events:none; z-index:1;
   background:conic-gradient(from 30deg, transparent 0 8%, rgba(255,255,255,.10) 13%, transparent 20% 58%, rgba(255,255,255,.07) 63%, transparent 70%); }
 /* 唱臂:支点在唱片右上角外侧;播放时落在外圈纹路上,暂停时向右抬起 */
 .vinyl-arm { position:absolute; z-index:2; width:calc(var(--disc) * .3); height:calc(var(--disc) * .6);
@@ -119,7 +130,8 @@ html[data-wide="true"] .np.ctl-sm .np-ctl .iconbtn[aria-label="下一首"] svg {
 .vinyl.playing .vinyl-arm { transform:rotate(0deg); }
 @keyframes vinylSpin { to { transform:rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .vinyl-disc { animation:none; }
+  .vinyl-disc, .vinyl-slot { animation:none !important; }
+  .vinyl-slot[class*="leave-"] { display:none; }
   .vinyl-arm { transition:none; }
 }
 /* 切歌时封面 / 歌词丝滑淡入(靠 key=歌曲id 重挂载触发) */
@@ -215,6 +227,6 @@ html[data-short="true"] .np .iconbtn { min-width:48px; width:48px; height:48px; 
 html[data-short="true"] .np .np-ctl svg { width:26px; height:26px; }
 html[data-short="true"] .np-collapse { height:40px; min-height:40px; margin-top:4px; }
 html[data-short="true"] .np-volume { padding-bottom:0; }
-.np { overflow-y:auto; }
+.np { overflow-y:auto; overflow-x:hidden; } /* 换碟滑动时唱片会短暂越出边界,不能因此出现横向滚动条 */
 .np.split { grid-template-columns:min(var(--splitw,440px),62%) minmax(0,1fr); }
 html[data-wide="false"] .np.split { grid-template-columns:1fr; }
