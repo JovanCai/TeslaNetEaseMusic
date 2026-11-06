@@ -14,15 +14,20 @@ on:
       - '**.md'
       - 'docs/**'
   workflow_dispatch:
+  # 每周一自动重建一次:即使代码没变,也能用上 Node / Alpine 基础镜像的最新安全补丁
+  schedule:
+    - cron: '0 3 * * 1'
 
+# 默认只读;推镜像的写权限只给 build 任务
 permissions:
   contents: read
-  packages: write
 
 jobs:
   # 先跑前后端测试 + 类型检查,全部通过才构建/推送镜像,避免坏版本被 update.sh 拉到车上
   test:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
 
@@ -38,6 +43,12 @@ jobs:
         working-directory: server
         run: npm ci && npm test
 
+      # 会进镜像的生产依赖出现高危/严重漏洞时直接失败(每周定时构建也会跑,能及时发现新披露的漏洞)
+      - name: Audit production dependencies
+        run: |
+          (cd server && npm audit --omit=dev --audit-level=high)
+          (cd web && npm audit --omit=dev --audit-level=high)
+
       - name: Web tests, lint & build
         working-directory: web
         run: npm ci && npm test && npm run lint && npm run build
@@ -46,6 +57,9 @@ jobs:
     needs: test
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v7
 
@@ -76,5 +90,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # 总是拉取最新的 node:24-alpine;每周定时构建时不用缓存,连同 npm 依赖层一起刷新
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

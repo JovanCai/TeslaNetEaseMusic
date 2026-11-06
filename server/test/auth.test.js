@@ -42,6 +42,17 @@ describe('auth', () => {
     expect((await request(app).post('/auth/login').send({ password: 'no' })).status).toBe(401)
     expect((await request(app).get('/api/x').set('Cookie', `tm_auth=${tokenFor('old')}`)).status).toBe(401)
   })
+  it('伪造来源 IP 绕过按 IP 限流时,全局上限仍会锁定', async () => {
+    let t = 0
+    const app = makeApp('pw', () => t)
+    for (let i = 0; i < 50; i++) {
+      const res = await request(app).post('/auth/login').set('CF-Connecting-IP', `10.0.${i}.1`).send({ password: 'no' })
+      expect(res.status).toBe(401) // 每个"IP"只错一次,按 IP 永远不会锁
+    }
+    expect((await request(app).post('/auth/login').set('CF-Connecting-IP', '10.9.9.9').send({ password: 'pw' })).status).toBe(429)
+    t = 11 * 60 * 1000
+    expect((await request(app).post('/auth/login').set('CF-Connecting-IP', '10.9.9.9').send({ password: 'pw' })).status).toBe(200)
+  })
   it('连续输错 10 次锁定,锁定期内正确密码也拒绝,过期后恢复', async () => {
     let t = 0
     const app = makeApp('pw', () => t)
