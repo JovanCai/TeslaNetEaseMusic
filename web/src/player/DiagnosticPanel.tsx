@@ -25,7 +25,7 @@ export function DiagnosticPanel() {
     setUpload({ state: 'busy', text: '' })
     try {
       const r = await uploadDiagnostics()
-      setUpload({ state: 'done', text: r.where === 'gist' ? r.url : `${location.origin}${r.url}` })
+      setUpload({ state: 'done', text: `diagnostics/${r.name}` })
     } catch (e) {
       setUpload({ state: 'fail', text: e instanceof Error ? e.message : String(e) })
     }
@@ -40,7 +40,7 @@ export function DiagnosticPanel() {
       <button onClick={() => { clearDiagnostics(); setView(null); setUpload({ state: 'idle', text: '' }) }}>清空</button>
       <button onClick={() => setDiagnostics(false)}>退出诊断</button>
     </div>
-    {upload.state === 'done' && <p className="diag-ok">已上传:<span className="diag-url">{upload.text}</span></p>}
+    {upload.state === 'done' && <p className="diag-ok">已保存到服务器:<span className="diag-url">{upload.text}</span></p>}
     {upload.state === 'fail' && <p className="diag-fail">上传失败:{upload.text}</p>}
     {view == null
       ? <p>复现问题后点「上传日志」。收起播放页、切到地图都会继续记录;退出或刷新会清空。日志只含歌曲 id、播放状态和网络状况,不含登录信息。</p>

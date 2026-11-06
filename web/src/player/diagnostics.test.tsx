@@ -55,7 +55,7 @@ it('requires eight consecutive taps and resets after a gap', () => {
 })
 
 it('面板不实时刷日志;查看时是定格副本;上传后显示地址;退出清空', async () => {
-  const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ url: 'https://gist.github.com/x/abc', where: 'gist' }) })
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ name: 'diag-2026-11-07T10-00-00-000Z.log', url: '/diag/files/diag-2026-11-07T10-00-00-000Z.log' }) })
   vi.stubGlobal('fetch', fetchMock)
   render(<DiagnosticPanel />)
   expect(screen.queryByLabelText('播放诊断')).toBeNull()
@@ -70,7 +70,7 @@ it('面板不实时刷日志;查看时是定格副本;上传后显示地址;退�
   await act(async () => { fireEvent.click(screen.getByText('上传日志')) })
   expect(fetchMock.mock.calls[0][0]).toBe('/diag/upload')
   expect(JSON.parse(fetchMock.mock.calls[0][1].body).text).toContain('after-view')
-  expect(screen.getByText('https://gist.github.com/x/abc')).toBeTruthy()
+  expect(screen.getByText('diagnostics/diag-2026-11-07T10-00-00-000Z.log')).toBeTruthy()
   fireEvent.click(screen.getByText('退出诊断'))
   expect(screen.queryByLabelText('播放诊断')).toBeNull()
   expect(diagnosticSnapshot().lines).toHaveLength(0)

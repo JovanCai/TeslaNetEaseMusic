@@ -75,13 +75,13 @@ export function diagnosticReport(): string {
   return [...head, ...snapshot.lines].join('\n')
 }
 
-// 上传到服务端:配置了 GitHub token 时存成私密 Gist,否则存在服务器数据卷。返回可打开的地址。
-export async function uploadDiagnostics(): Promise<{ url: string; where: 'gist' | 'server' }> {
+// 上传到服务端:保存在部署目录下的 diagnostics/ 里。返回文件名(在宿主机上按它找文件)。
+export async function uploadDiagnostics(): Promise<{ name: string; url: string }> {
   const r = await fetch('/diag/upload', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: diagnosticReport() }) })
   if (r.status === 401) window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT))
   const j = await r.json().catch(() => ({}))
-  if (!r.ok || !j?.url) throw new Error(j?.error || `upload ${r.status}`)
-  return { url: j.url, where: j.where }
+  if (!r.ok || !j?.name) throw new Error(j?.error || `upload ${r.status}`)
+  return { name: j.name, url: j.url }
 }
 
 export function useDiagnosticEntry(onEnter: () => void) {
