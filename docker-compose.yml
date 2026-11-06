@@ -21,6 +21,8 @@ services:
       - REGION_UNLOCK=${REGION_UNLOCK:-false}
       # 访问密码:设置后需输密码才能用(cookie 长期记住)。留空则不需要。
       - APP_PASSWORD=${APP_PASSWORD:-}
+      # 诊断日志上传到 GitHub 私密 Gist(可选)。留空则日志只存在服务器数据卷里。
+      - GITHUB_GIST_TOKEN=${GITHUB_GIST_TOKEN:-}
     volumes:
       - cookie-data:/data
     restart: unless-stopped

@@ -28,9 +28,9 @@ async function fetchJson(path: string, { timeout = 8000, retries = 2 } = {}): Pr
   throw lastErr
 }
 
-export async function getSongUrl(id: number, level = 'exhigh'): Promise<{ id: number; url: string | null } & ReplayGain> {
+export async function getSongUrl(id: number, level = 'exhigh', opts?: { timeout?: number; retries?: number }): Promise<{ id: number; url: string | null } & ReplayGain> {
   // 区域解锁(realIP)由后端按需自动注入,前端无需传参。
-  const j: any = await fetchJson(`/song/url/v1?id=${id}&level=${level}`)
+  const j: any = await fetchJson(`/song/url/v1?id=${id}&level=${level}`, opts)
   const raw: string | null = j?.data?.[0]?.url ?? null
   // 网易云常返回 http:// 地址;车机走 https 时 http 音频会被当混合内容拦掉,统一升级为 https。
   return { id, url: raw ? raw.replace(/^http:\/\//, 'https://') : null,
