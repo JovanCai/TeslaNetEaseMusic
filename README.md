@@ -84,6 +84,8 @@ cd TeslaNetEaseMusic
 
 - **重新登录 / 切换账号**:执行 `./relogin.sh` 后重新扫码。
 - **更新版本**:一条命令 `./update.sh`——拉取预构建镜像并重启,部署端不用本地编译,登录状态保留。
+- **网易云接口服务(ncm-api)版本**:`docker-compose.yml` 里固定了版本与 digest,不随 `latest` 自动升级(它持有你的登录态)。需要升级时到 Docker Hub 查 `moefurina/ncm-api` 的新版本,改这一行后执行 `./update.sh`。
+- **安全更新**:CI 每周一自动用最新的 Node / Alpine 基础镜像重建一次,并检查生产依赖的已知漏洞;平时执行 `./update.sh` 即可用上补丁。
 
 ## 隐私与安全
 

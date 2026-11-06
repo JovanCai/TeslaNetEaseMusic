@@ -10,16 +10,21 @@ export const ALLOWED_PATHS = new Set([
   '/dj/sublist', '/dj/recommend', '/dj/program',
 ])
 
+// 网易云接口服务会识别这些查询参数,改变它发请求的方式:proxy 让请求走任意代理、cookie 替换登录态、
+// realIP/randomCNIP 伪造来源 IP、ua 换 UA。前端从不传它们,一律去掉(区域解锁的 realIP 由下面服务端自己加)。
+const STRIPPED_PARAMS = ['proxy', 'cookie', 'realIP', 'randomCNIP', 'ua']
+
 export function apiProxy({ ncmBase, store, regionUnlock = false, allowed = ALLOWED_PATHS }) {
   return async (req, res) => {
     if (!allowed.has(req.path)) return res.status(403).json({ error: 'forbidden', path: req.path })
     const cookie = store.read()
     const headers = {}
     if (cookie) headers.Cookie = `MUSIC_U=${cookie}`
-    let url = `${ncmBase}${req.url}`
-    if (regionUnlock) {
-      url += (url.includes('?') ? '&' : '?') + 'realIP=' + randomChinaIP()
-    }
+    const params = new URL(req.originalUrl, 'http://local').searchParams
+    for (const key of [...params.keys()]) if (STRIPPED_PARAMS.includes(key)) params.delete(key)
+    if (regionUnlock) params.set('realIP', randomChinaIP())
+    const qs = params.toString()
+    const url = `${ncmBase}${req.path}${qs ? `?${qs}` : ''}`
     try {
       const upstream = await fetch(url, { headers })
       const body = await upstream.text()

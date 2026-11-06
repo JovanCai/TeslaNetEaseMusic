@@ -2,7 +2,15 @@
   "name": "tesla-music-server",
   "private": true,
   "type": "module",
-  "scripts": { "start": "node src/index.js", "test": "vitest run" },
-  "dependencies": { "express": "^4.21.2" },
-  "devDependencies": { "vitest": "^4.1.10", "supertest": "^7.1.1" }
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "express": "^4.22.3"
+  },
+  "devDependencies": {
+    "supertest": "^7.1.1",
+    "vitest": "^4.1.10"
+  }
 }

@@ -5,6 +5,7 @@ import { sessionRouter } from './session.js'
 import { apiProxy } from './apiProxy.js'
 import { createAuth } from './auth.js'
 import { diagRouter } from './diag.js'
+import { securityHeaders, blockCrossSite } from './security.js'
 
 const PORT = Number(process.env.PORT || 80)
 const NCM = process.env.NCM_BASE || 'http://ncm-api:3000'
@@ -19,7 +20,13 @@ if (!store.read() && process.env.NCM_MUSIC_U) store.write(process.env.NCM_MUSIC_
 const auth = createAuth({ password: process.env.APP_PASSWORD || '' })
 
 const app = express()
-app.set('trust proxy', true) // 经 Cloudflare 隧道时按 X-Forwarded-* 判断 https / 来源 IP
+app.disable('x-powered-by')
+// 只信任本机与内网地址转发来的 X-Forwarded-*(Cloudflare 隧道容器在 Docker 内网里)。
+// 原来是 true(信任任何来源),端口直接暴露在公网时客户端可伪造来源 IP / https。
+app.set('trust proxy', 'loopback, linklocal, uniquelocal')
+app.use(securityHeaders)
+// 接口一律拒绝其他网站发起的请求(防 CSRF);静态页面不受影响
+for (const prefix of ['/diag', '/auth', '/session', '/api']) app.use(prefix, blockCrossSite)
 // 诊断上传放在全局 json 之前:日志可达 2MB,超过全局 json 的 100kb 上限
 app.use('/diag', auth.guard, diagRouter({ dir: DIAG_DIR }))
 app.use(express.json())

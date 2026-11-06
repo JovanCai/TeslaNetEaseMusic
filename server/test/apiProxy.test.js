@@ -27,6 +27,19 @@ describe('apiProxy', () => {
     const res = await request(appWith(null)).get('/api/cloudsearch?keywords=x')
     expect(JSON.parse(res.text).cookie).toBeNull()
   })
+  it('去掉会改变上游行为的危险参数(proxy/cookie/realIP 等),保留正常参数', async () => {
+    const res = await request(appWith('U')).get('/api/cloudsearch?keywords=%E5%91%A8%20%E6%9D%B0&proxy=http://evil:8080&cookie=MUSIC_U%3Dx&realIP=1.2.3.4&randomCNIP=true&ua=x&limit=30')
+    const url = new URL(JSON.parse(res.text).url)
+    expect(url.pathname).toBe('/cloudsearch')
+    expect([...url.searchParams.keys()]).toEqual(['keywords', 'limit'])
+    expect(url.searchParams.get('keywords')).toBe('周 杰')
+  })
+  it('区域解锁时 realIP 只能由服务端设置,客户端传的被覆盖', async () => {
+    const res = await request(appWith('U', true)).get('/api/song/url/v1?id=5&realIP=8.8.8.8')
+    const url = new URL(JSON.parse(res.text).url)
+    expect(url.searchParams.getAll('realIP')).toHaveLength(1)
+    expect(url.searchParams.get('realIP')).not.toBe('8.8.8.8')
+  })
   it('白名单外的接口返回 403,不转发', async () => {
     const app = appWith('U')
     const res = await request(app).get('/api/logout')
