@@ -4,4 +4,6 @@ dist/
 .env.local
 *.log
 .superpowers/
-diagnostics/
+# 诊断日志不入库,但保留目录本身:群晖 Docker 不会自动创建绑定挂载的目录,缺了会启动失败
+diagnostics/*
+!diagnostics/.gitkeep
