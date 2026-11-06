@@ -18,6 +18,7 @@ ok "Docker 正常"
 
 # 2) 配置文件
 if [ ! -f .env ]; then cp .env.example .env; ok "已生成 .env(默认配置即可)"; fi
+mkdir -p diagnostics # 诊断日志的挂载目录:有的 Docker(如群晖)不会自动创建,缺了会启动失败
 
 # 3) 起服务(首次拉取预构建镜像,约 1 分钟)
 say "启动服务中(首次拉取镜像稍慢,请稍候)……"

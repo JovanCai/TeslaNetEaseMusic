@@ -11,6 +11,9 @@ git pull --ff-only
 DOCKER="docker"
 if ! docker info >/dev/null 2>&1; then DOCKER="sudo docker"; fi
 
+# 诊断日志的挂载目录:群晖 Docker 不会自动创建绑定挂载的目录,缺了会启动失败
+mkdir -p diagnostics
+
 # 3) 拉最新镜像并重启(带隧道)
 $DOCKER compose --profile tunnel pull
 $DOCKER compose --profile tunnel up -d
