@@ -9,7 +9,7 @@ import { Icon } from '../components/Icon'
 import './player.css'
 import { displayScale } from '../ui/displayScale'
 import { DiagnosticPanel } from './DiagnosticPanel'
-import { diagnosticSnapshot, setDiagnostics, useDiagnosticEntry } from './diagnostics'
+import { diagnostic, diagnosticSnapshot, setDiagnostics, useDiagnosticEntry } from './diagnostics'
 
 function fmt(ms: number) {
   const s = Math.max(0, Math.floor(ms / 1000))
@@ -86,6 +86,13 @@ export function NowPlaying({ open, onClose, onOpenAlbum, onOpenArtist }: {
   const [offsetFor, setOffsetFor] = useState(curId)
   if (offsetFor !== curId) { setOffsetFor(curId); setLyricOffsetState(getLyricOffset(curId)) } // 换歌:读这首的偏移
   function changeLyricOffset(next: number) { setLyricOffsetState(setLyricOffset(curId, next)) }
+  // 诊断:记下每首歌生效的歌词偏移,便于区分「误触调过偏移」和「播放位置真的错了」
+  useEffect(() => {
+    const report = () => { if (curId >= 0) diagnostic('lyric.offset', { song: curId, offset: lyricOffset }) }
+    report()
+    window.addEventListener('tm-diagnostic-snapshot', report)
+    return () => window.removeEventListener('tm-diagnostic-snapshot', report)
+  }, [curId, lyricOffset])
   const [showTrans, setShowTrans] = useState(() => {
     try { return localStorage.getItem('tm.showtrans') !== '0' } catch { return true }
   })

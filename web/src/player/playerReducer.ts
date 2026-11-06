@@ -21,7 +21,7 @@ export const initialPlayerState: PlayerState = {
 export type Action =
   | { type: 'playList'; songs: Song[]; start: number }
   | { type: 'startRadar'; songs: Song[] } | { type: 'appendSongs'; songs: Song[] }
-  | { type: 'toggle' } | { type: 'next' } | { type: 'ended' } | { type: 'prev' } | { type: 'stop' }
+  | { type: 'toggle' } | { type: 'next' } | { type: 'ended' } | { type: 'prev' } | { type: 'stop' } | { type: 'reload' }
   | { type: 'setShuffle'; on: boolean } | { type: 'cycleRepeat' }
   | { type: 'setLrc'; lrc: string; tlyric: string; pureMusic: boolean }
   | { type: 'jumpTo'; pos: number } | { type: 'removeAt'; pos: number }
@@ -62,6 +62,7 @@ export function playerReducer(s: PlayerState, a: Action): PlayerState {
     }
     case 'toggle': return { ...s, isPlaying: !s.isPlaying }
     case 'stop': return { ...s, isPlaying: false }
+    case 'reload': return s.pos < 0 ? s : { ...s, playToken: s.playToken + 1 } // 重新加载当前曲(取地址失败后网络恢复时重试)
     case 'ended': { // 自动续播(曲终):遵循单曲循环=重播当前
       if (s.repeat !== 'one' && endOfShuffleRound(s)) return startNewShuffleRound(s)
       const p = nextIndex(s.order.length, s.pos, s.repeat)

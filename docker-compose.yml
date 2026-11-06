@@ -23,6 +23,8 @@ services:
       - APP_PASSWORD=${APP_PASSWORD:-}
     volumes:
       - cookie-data:/data
+      # 车机上传的诊断日志直接落在宿主机项目目录下的 diagnostics/(群晖 File Station 可见)
+      - ./diagnostics:/diagnostics
     restart: unless-stopped
 
   # 可选一:固定地址的 Cloudflare 隧道(需要一个加到 Cloudflare 的域名)。
