@@ -117,9 +117,6 @@ html[data-wide="true"] .np.ctl-sm .np-ctl .iconbtn[aria-label="下一首"] svg {
 @keyframes vinylInFromRight { from { transform:translateX(125%); opacity:0; } }
 @keyframes vinylInFromLeft { from { transform:translateX(-125%); opacity:0; } }
 .vinyl-cover { width:64%; height:64%; border-radius:50%; object-fit:cover; box-shadow:0 0 0 calc(var(--disc) * .02) #0b0b0b; }
-/* 中心轴孔 */
-.vinyl-disc::after { content:''; position:absolute; width:5%; height:5%; border-radius:50%; background:#0b0b0b;
-  box-shadow:0 0 0 1.5px rgba(255,255,255,.25); }
 /* 固定的高光(不随唱片转,但随唱片槽一起滑),转动时才有黑胶反光的质感 */
 .vinyl-slot::after { content:''; position:absolute; inset:0; border-radius:50%; pointer-events:none; z-index:1;
   background:conic-gradient(from 30deg, transparent 0 8%, rgba(255,255,255,.10) 13%, transparent 20% 58%, rgba(255,255,255,.07) 63%, transparent 70%); }
